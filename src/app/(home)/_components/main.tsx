@@ -1,5 +1,5 @@
-import Stories from "./stories";
-import Pages from "./pages";
+import Stories from "./stories"
+import Pages from "./pages"
 
 const Main = () => {
   return (
@@ -9,7 +9,7 @@ const Main = () => {
         <Pages />
       </div>
     </section>
-  );
-};
+  )
+}
 
-export default Main;
+export default Main

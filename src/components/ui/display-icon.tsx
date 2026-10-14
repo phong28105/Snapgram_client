@@ -1,14 +1,21 @@
 import { TSidebarList } from "@/data";
 import { IoMdHome } from "react-icons/io";
-import Badge from "./badge";
+import { Badge } from "./badge";
 import Image from "next/image";
 
 const DisplayIcon = ({ list }: { list: TSidebarList }) => (
   <div className="relative">
     {/* BADGE */}
-    {list.title === "Messages" ? <Badge total={123} /> : null}
+    {list.title === "Tin nhắn" ? (
+      <Badge
+        variant="destructive"
+        className="z-10 absolute -top-1.5 left-2.5 h-[18px] min-w-[18px] px-1 rounded-full text-[10px] font-semibold flex items-center justify-center p-0"
+      >
+        9+
+      </Badge>
+    ) : null}
 
-    {list.title === "Home" ? (
+    {list.title.toLowerCase() === "trang chủ" ? (
       <IoMdHome className="transition duration-75 xl:-translate-x-[2.5px] xl:w-[26.5px] xl:h-[26.5px] max-xl:w-[30.5px] max-xl:h-[30.5px] max-xl:group-hover:scale-105" />
     ) : (
       list.icon && (

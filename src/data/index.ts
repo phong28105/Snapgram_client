@@ -12,6 +12,7 @@ import {
 export type TSidebarList = {
   title: string;
   active: boolean;
+  href?: string;
   icon?: React.ForwardRefExoticComponent<
     Omit<LucideProps, "ref"> & React.RefAttributes<SVGSVGElement>
   >;
@@ -22,6 +23,7 @@ export const sidebarLists: TSidebarList[] = [
   {
     title: "Trang chủ",
     active: true,
+    href: "/",
     icon: House,
   },
   {
@@ -32,16 +34,19 @@ export const sidebarLists: TSidebarList[] = [
   {
     title: "Khám phá",
     active: false,
+    href: "/explore",
     icon: Telescope,
   },
   {
     title: "Reels",
     active: false,
+    href: "/reels",
     icon: Film,
   },
   {
     title: "Tin nhắn",
     active: false,
+    href: "/direct/inbox",
     icon: MessageCircle,
   },
   {
@@ -57,6 +62,7 @@ export const sidebarLists: TSidebarList[] = [
   {
     title: "Trang cá nhân",
     active: false,
+    href: "/profile",
     img: "/profile.jpg",
   },
 ];

@@ -1,29 +1,56 @@
+"use client";
+
 import { profiles, siderightFooterLists } from "@/data";
+import { useAuth } from "@/hooks/use-auth";
+import { useLoginModal } from "@/components/providers/login-modal-provider";
+import Link from "next/link";
 
 const Sideright = () => {
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const { openLoginModal } = useLoginModal();
+
   return (
     <aside className="max-[1160px]:hidden ps-16 pt-8 w-[319px]">
       <div className="flex flex-col space-y-6">
-        {/* switch account */}
-        <div className="flex flex-row items-center justify-between w-full">
-          <div className="flex flex-row items-center gap-x-3">
-            <img
-              src="/profile.jpg"
-              alt="profile"
-              width={44}
-              height={44}
-              className="w-[44px] h-[44px] object-cover rounded-full"
-            />
-            <h6 className="text-xs font-bold tracking-tighter">433</h6>
-          </div>
+        {/* current user account or login prompt */}
+        {isAuthenticated && user ? (
+          <div className="flex flex-row items-center justify-between w-full">
+            <Link href="/profile" className="flex flex-row items-center gap-x-3 hover:opacity-80 transition">
+              <img
+                src={user.avatarUrl || "/profile.jpg"}
+                alt={user.username || "profile"}
+                width={44}
+                height={44}
+                className="w-[44px] h-[44px] object-cover rounded-full"
+              />
+              <div className="flex flex-col">
+                <h6 className="text-xs font-bold tracking-tighter">{user.username}</h6>
+                <span className="text-[11px] text-muted-foreground truncate max-w-[140px]">{user.displayName || user.email}</span>
+              </div>
+            </Link>
 
-          <button
-            type="button"
-            className="font-semibold text-blue-500  text-xs hover:opacity-80 transition duration-75"
-          >
-            Chuyển
-          </button>
-        </div>
+            <Link
+              href="/login"
+              className="font-semibold text-blue-500 text-xs hover:opacity-80 transition duration-75"
+            >
+              Chuyển
+            </Link>
+          </div>
+        ) : !isLoading ? (
+          <div className="flex flex-row items-center justify-between w-full p-3 rounded-xl border border-border bg-card/60">
+            <div className="flex flex-col">
+              <h6 className="text-xs font-bold">Đăng nhập Snapgram</h6>
+              <span className="text-[11px] text-muted-foreground">Để xem thêm bài viết & tương tác</span>
+            </div>
+            <button
+              type="button"
+              onClick={openLoginModal}
+              className="font-semibold text-xs text-primary hover:underline transition"
+            >
+              Đăng nhập
+            </button>
+          </div>
+        ) : null}
 
         {/* Suggested for you */}
         <div className="flex flex-col space-y-4">
@@ -86,7 +113,7 @@ const Sideright = () => {
           </ul>
 
           <h6 className="text-muted-foreground text-xs uppercase">
-            &copy; Instagram
+            &copy; 2026 Snapgram
           </h6>
         </div>
       </footer>
