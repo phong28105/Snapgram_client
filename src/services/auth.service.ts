@@ -1,10 +1,13 @@
 import { apiClient } from "@/lib/api"
 import type {
+  ForgotPasswordPayload,
   LoginPayload,
   LoginResponse,
   RegisterPayload,
   RegisterResponse,
+  ResetPasswordPayload,
   TwoFaPayload,
+  UserDto,
   UserMe,
 } from "@/types/auth.type"
 
@@ -29,8 +32,36 @@ export const authService = {
     return res.data
   },
 
+  async getUserInfo(): Promise<UserDto> {
+    const res = await apiClient.get<UserDto>("/api/auth/user")
+    return res.data
+  },
+
+  async verifyToken(): Promise<boolean> {
+    const res = await apiClient.post<boolean>("/api/auth/verify")
+    return res.data
+  },
+
   async refreshToken(): Promise<void> {
     await apiClient.post("/api/auth/refresh", {})
+  },
+
+  async forgotPassword(params: ForgotPasswordPayload): Promise<void> {
+    await apiClient.post("/api/auth/forgot-password", params)
+  },
+
+  async resetPassword(params: ResetPasswordPayload): Promise<void> {
+    await apiClient.post("/api/auth/reset-password", params)
+  },
+
+  async verifyEmail(token: string): Promise<void> {
+    await apiClient.get("/api/auth/verify-email", {
+      params: { token },
+    })
+  },
+
+  async sendVerificationEmail(): Promise<void> {
+    await apiClient.post("/api/users/me/send-verification-email")
   },
 
   async logout(): Promise<void> {
@@ -39,5 +70,5 @@ export const authService = {
     } finally {
       window.location.href = "/login"
     }
-  }
+  },
 }

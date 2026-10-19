@@ -32,6 +32,29 @@ export const twoFaSchema = z.object({
     .max(20, "Mã xác thực không hợp lệ."),
 })
 
+export const forgotPasswordSchema = z.object({
+  email: z
+    .string()
+    .min(1, "Vui lòng nhập email.")
+    .email("Email không hợp lệ."),
+})
+
+export const resetPasswordSchema = z
+  .object({
+    token: z.string().min(1, "Vui lòng nhập mã đặt lại mật khẩu (token)."),
+    newPassword: z
+      .string()
+      .min(8, "Mật khẩu mới tối thiểu 8 ký tự.")
+      .max(128, "Mật khẩu mới tối đa 128 ký tự."),
+    confirmPassword: z.string().min(1, "Vui lòng xác nhận mật khẩu mới."),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Mật khẩu xác nhận không khớp.",
+    path: ["confirmPassword"],
+  })
+
 export type LoginInput = z.infer<typeof loginSchema>
 export type RegisterInput = z.infer<typeof registerSchema>
 export type TwoFaInput = z.infer<typeof twoFaSchema>
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>

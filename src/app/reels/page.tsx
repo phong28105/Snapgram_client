@@ -185,6 +185,10 @@ export default function ReelsPage() {
                   </span>
                   <button
                     type="button"
+                    onClick={() => {
+                      if (!isAuthenticated) openLoginModal()
+                      else toast.success(`Đã theo dõi ${currentReel.author.username}`)
+                    }}
                     className="text-xs font-semibold px-2.5 py-1 rounded-md border border-white/40 hover:bg-white/20 transition backdrop-blur-sm"
                   >
                     Theo dõi

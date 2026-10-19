@@ -24,12 +24,12 @@ const DisplayIcon = ({ list }: { list: TSidebarList }) => (
     )}
 
     {list.img && (
-      <Image
+      <img
         src={list.img}
         alt="profile"
-        width={100}
-        height={100}
-        className="object-cover rounded-full xl:w-[22px] xl:h-[22px] max-xl:w-[24px] max-xl:h-[24px] max-xl:rounded-full max-xl:group-hover:scale-105 max-xl:transition max-xl:duration-75"
+        className={`object-cover rounded-full xl:w-[22px] xl:h-[22px] max-xl:w-[24px] max-xl:h-[24px] max-xl:rounded-full max-xl:group-hover:scale-105 max-xl:transition max-xl:duration-75 ${
+          list.active ? "ring-2 ring-foreground" : ""
+        }`}
       />
     )}
   </div>

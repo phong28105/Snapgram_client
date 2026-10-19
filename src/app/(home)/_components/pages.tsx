@@ -99,6 +99,10 @@ function PostCard({ post }: { post: PostProps }) {
   }
 
   const handleDoubleTap = () => {
+    if (!isAuthenticated) {
+      openLoginModal()
+      return
+    }
     if (!isLiked) {
       setIsLiked(true)
       setLikesCount((prev) => prev + 1)

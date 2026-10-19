@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from "react"
 import { authService } from "@/services/auth.service"
+import { userService } from "@/services/user.service"
 import type {
   LoginPayload,
   LoginResponse,
@@ -45,6 +46,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     fetchCurrentUser()
   }, [fetchCurrentUser])
+
+  // Gửi heartbeat định kỳ mỗi 2 phút khi đã đăng nhập
+  useEffect(() => {
+    if (!user) return
+    userService.heartbeat().catch(() => {})
+    const timer = setInterval(() => {
+      userService.heartbeat().catch(() => {})
+    }, 120_000)
+    return () => clearInterval(timer)
+  }, [user])
 
   const login = async (params: LoginPayload): Promise<LoginResponse> => {
     const res = await authService.login(params)

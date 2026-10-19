@@ -31,6 +31,15 @@ export interface TwoFaPayload {
   backupCode?: string
 }
 
+export interface ForgotPasswordPayload {
+  email: string
+}
+
+export interface ResetPasswordPayload {
+  token: string
+  newPassword: string
+}
+
 export interface LoginResponse {
   accessToken?: string
   refreshToken?: string

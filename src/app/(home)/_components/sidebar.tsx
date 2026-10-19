@@ -1,3 +1,5 @@
+"use client"
+
 import { sidebarLists } from "@/data"
 import { Blocks } from "lucide-react"
 import DisplayIcon from "@/components/ui/display-icon"
@@ -6,8 +8,13 @@ import { MoreMenu } from "./more-menu"
 import SnapgramLogo from "@/components/logo/SnapgramLogo"
 import SnapgramThumb from "@/components/logo/SnapgramThumb"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { useAuth } from "@/hooks/use-auth"
 
 const Sidebar = () => {
+  const pathname = usePathname()
+  const { user } = useAuth()
+
   return (
     <aside className="sticky top-0 w-[72px] xl:w-[244px] 2xl:w-[335px] max-md:hidden border-r border-border h-screen pb-5 pt-2 px-3">
       <div className="flex flex-col h-full justify-between">
@@ -23,11 +30,22 @@ const Sidebar = () => {
 
           <ul className="flex flex-col max-xl:space-y-4">
             {sidebarLists.map((list, listIndex) => {
+              const isActive = list.href
+                ? list.href === "/"
+                  ? pathname === "/"
+                  : pathname.startsWith(list.href)
+                : false
+
+              const itemWithAvatar =
+                list.title === "Trang cá nhân" && user?.avatarUrl
+                  ? { ...list, img: user.avatarUrl, active: isActive }
+                  : { ...list, active: isActive }
+
               if (list.title === "Tạo") {
                 return (
                   <CreatePost key={listIndex}>
                     <li className="flex items-center xl:my-1 xl:gap-3 xl:p-3 rounded-lg hover:bg-gray-200/10 cursor-pointer transition max-xl:p-2 max-xl:justify-center group">
-                      <DisplayIcon list={list} />
+                      <DisplayIcon list={itemWithAvatar} />
                       <span className="max-xl:hidden text-base font-light">{list.title}</span>
                     </li>
                   </CreatePost>
@@ -35,9 +53,17 @@ const Sidebar = () => {
               }
 
               const itemContent = (
-                <li className="flex items-center xl:my-1 xl:gap-3 xl:p-3 rounded-lg hover:bg-accent cursor-pointer transition max-xl:p-2 max-xl:justify-center group">
-                  <DisplayIcon list={list} />
-                  <span className={`max-xl:hidden text-base ${list.active ? "font-bold" : "font-light"} ${list.title.toLowerCase() === "trang chủ" ? "-translate-x-[2.8px]" : ""}`}>
+                <li
+                  className={`flex items-center xl:my-1 xl:gap-3 xl:p-3 rounded-lg hover:bg-accent cursor-pointer transition max-xl:p-2 max-xl:justify-center group ${
+                    isActive ? "bg-accent/50" : ""
+                  }`}
+                >
+                  <DisplayIcon list={itemWithAvatar} />
+                  <span
+                    className={`max-xl:hidden text-base ${
+                      isActive ? "font-bold" : "font-light"
+                    } ${list.title.toLowerCase() === "trang chủ" ? "-translate-x-[2.8px]" : ""}`}
+                  >
                     {list.title}
                   </span>
                 </li>

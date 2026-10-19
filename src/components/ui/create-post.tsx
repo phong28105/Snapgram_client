@@ -12,6 +12,8 @@ import { ArrowLeft, FileVideo, Image, Loader2, Smile } from "lucide-react"
 import { toast } from "sonner"
 import { useAuth } from "@/hooks/use-auth"
 import { useLoginModal } from "@/components/providers/login-modal-provider"
+import { mediaService } from "@/services/media.service"
+import { getErrorMessage } from "@/lib/api"
 
 interface CreatePostProps {
   children: React.ReactNode
@@ -55,18 +57,26 @@ const CreatePost: React.FC<CreatePostProps> = ({ children }) => {
   }
 
   const handleShare = async () => {
-    if (!previewUrl) return
+    if (!previewUrl || !selectedFile) return
     setIsSubmitting(true)
 
-    // Simulate upload delay
-    await new Promise((resolve) => setTimeout(resolve, 800))
-
-    setIsSubmitting(false)
-    toast.success("Bài viết của bạn đã được chia sẻ thành công!")
-    setIsOpen(false)
-    setSelectedFile(null)
-    setPreviewUrl(null)
-    setCaption("")
+    try {
+      // Nếu file > 5MB hoặc là video thì ưu tiên Presigned Upload, ngược lại dùng Direct Multipart Upload
+      if (selectedFile.size > 5 * 1024 * 1024 || selectedFile.type.startsWith("video/")) {
+        await mediaService.uploadViaPresigned(selectedFile)
+      } else {
+        await mediaService.upload(selectedFile)
+      }
+      toast.success("Tải media và chia sẻ bài viết thành công!")
+      setIsOpen(false)
+      setSelectedFile(null)
+      setPreviewUrl(null)
+      setCaption("")
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Không thể tải media lên máy chủ."))
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (

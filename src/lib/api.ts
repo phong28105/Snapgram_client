@@ -38,13 +38,17 @@ export function getErrorMessage(
 // Các endpoint này 401 là lỗi thật, không refresh
 const NO_REFRESH_PATHS = [
   "/api/auth/login",
+  "/api/auth/login/2fa",
   "/api/auth/register",
   "/api/auth/refresh",
   "/api/auth/logout",
   "/api/auth/me",
+  "/api/auth/forgot-password",
+  "/api/auth/reset-password",
+  "/api/auth/verify-email",
 ]
 
-const AUTH_PAGES = ["/login", "/register"]
+const AUTH_PAGES = ["/login", "/register", "/forgot-password", "/reset-password", "/verify-email"]
 
 // Nhiều request 401 cùng lúc thì chỉ refresh 1 lần, các request còn lại chờ chung kết quả
 let refreshPromise: Promise<unknown> | null = null

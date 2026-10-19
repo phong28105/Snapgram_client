@@ -14,11 +14,25 @@ import { loginSchema, twoFaSchema, type LoginInput, type TwoFaInput } from "@/va
 import { useAuth } from "@/hooks/use-auth"
 import axios from "axios"
 
-export default function LoginForm() {
+interface LoginFormProps {
+  onSuccess?: () => void
+}
+
+export default function LoginForm({ onSuccess }: LoginFormProps = {}) {
   const { login, login2Fa } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [requiresTwoFa, setRequiresTwoFa] = useState(false)
   const [tempToken, setTempToken] = useState<string | null>(null)
+
+  const handleLoginSuccess = () => {
+    if (onSuccess) {
+      onSuccess()
+      return
+    }
+    const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null
+    const redirect = params?.get("redirect")
+    window.location.href = redirect && redirect.startsWith("/") ? redirect : "/"
+  }
 
   const loginForm = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -38,7 +52,7 @@ export default function LoginForm() {
         setRequiresTwoFa(true)
         return
       }
-      window.location.href = "/"
+      handleLoginSuccess()
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 401) {
         // Anti-brute force / anti-enumeration message chuẩn hóa
@@ -56,12 +70,14 @@ export default function LoginForm() {
 
   async function onTwoFaSubmit(values: TwoFaInput) {
     if (!tempToken) return
+    const code = values.code.trim()
+    const isTotp = /^\d{6}$/.test(code)
     try {
       await login2Fa({
         tempToken,
-        totpCode: values.code,
+        ...(isTotp ? { totpCode: code } : { backupCode: code }),
       })
-      window.location.href = "/"
+      handleLoginSuccess()
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 401) {
         twoFaForm.setError("root", {
@@ -138,7 +154,10 @@ export default function LoginForm() {
             />
 
             <div className="flex justify-end -mt-1">
-              <Link href="#" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+              <Link
+                href="/forgot-password"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
                 Quên mật khẩu?
               </Link>
             </div>

@@ -27,15 +27,10 @@ export const sidebarLists: TSidebarList[] = [
     icon: House,
   },
   {
-    title: "Tìm kiếm",
-    active: false,
-    icon: Search,
-  },
-  {
     title: "Khám phá",
     active: false,
     href: "/explore",
-    icon: Telescope,
+    icon: Search,
   },
   {
     title: "Reels",

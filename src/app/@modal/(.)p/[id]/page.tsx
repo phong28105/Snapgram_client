@@ -55,27 +55,46 @@ export default function PostModal({
     },
   ])
   const [commentInput, setCommentInput] = useState("")
+  const [isFollowing, setIsFollowing] = useState(false)
+  const commentInputRef = React.useRef<HTMLInputElement | null>(null)
 
-  const handleToggleLike = () => {
+  const requireAuth = (action: () => void) => {
     if (!isAuthenticated) {
       openLoginModal()
       return
     }
-    if (isLiked) {
-      setIsLiked(false)
-      setLikesCount((prev) => Math.max(0, prev - 1))
-    } else {
-      setIsLiked(true)
-      setLikesCount((prev) => prev + 1)
-    }
+    action()
+  }
+
+  const handleToggleLike = () => {
+    requireAuth(() => {
+      if (isLiked) {
+        setIsLiked(false)
+        setLikesCount((prev) => Math.max(0, prev - 1))
+      } else {
+        setIsLiked(true)
+        setLikesCount((prev) => prev + 1)
+      }
+    })
   }
 
   const handleToggleBookmark = () => {
-    if (!isAuthenticated) {
-      openLoginModal()
-      return
-    }
-    setIsBookmarked((prev) => !prev)
+    requireAuth(() => {
+      setIsBookmarked((prev) => !prev)
+    })
+  }
+
+  const handleCommentButtonClick = () => {
+    requireAuth(() => {
+      commentInputRef.current?.focus()
+    })
+  }
+
+  const handleReplyClick = (username: string) => {
+    requireAuth(() => {
+      setCommentInput(`@${username} `)
+      commentInputRef.current?.focus()
+    })
   }
 
   const handleAddComment = (e: React.FormEvent) => {
@@ -112,7 +131,10 @@ export default function PostModal({
         <DialogTitle className="sr-only">Chi tiết bài viết {postId}</DialogTitle>
 
         {/* Media Preview (Left / Top on mobile) */}
-        <div className="flex-1 bg-black flex items-center justify-center overflow-hidden min-h-[300px] md:min-h-full">
+        <div
+          className="flex-1 bg-black flex items-center justify-center overflow-hidden min-h-[300px] md:min-h-full cursor-pointer select-none"
+          onDoubleClick={handleToggleLike}
+        >
           <img
             src="/profile.jpg"
             alt="Post content"
@@ -135,13 +157,21 @@ export default function PostModal({
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-xs tracking-tight">snapgram_official</span>
                 <span className="text-xs text-muted-foreground">•</span>
-                <button type="button" className="text-xs font-semibold text-primary hover:text-primary/80 transition">
-                  Theo dõi
+                <button
+                  type="button"
+                  onClick={() => requireAuth(() => setIsFollowing((p) => !p))}
+                  className="text-xs font-semibold text-primary hover:text-primary/80 transition"
+                >
+                  {isFollowing ? "Đang theo dõi" : "Theo dõi"}
                 </button>
               </div>
             </div>
 
-            <button type="button" className="text-muted-foreground hover:text-foreground transition p-1">
+            <button
+              type="button"
+              onClick={() => requireAuth(() => {})}
+              className="text-muted-foreground hover:text-foreground transition p-1"
+            >
               <MoreHorizontal className="size-4" />
             </button>
           </div>
@@ -179,7 +209,11 @@ export default function PostModal({
                   </p>
                   <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
                     <TimeAgo date={comment.createdAt} />
-                    <button type="button" className="font-semibold hover:text-foreground transition">
+                    <button
+                      type="button"
+                      onClick={() => handleReplyClick(comment.username)}
+                      className="font-semibold hover:text-foreground transition"
+                    >
                       Trả lời
                     </button>
                   </div>
@@ -203,10 +237,18 @@ export default function PostModal({
                     }`}
                   />
                 </button>
-                <button type="button" className="hover:opacity-75 transition">
+                <button
+                  type="button"
+                  onClick={handleCommentButtonClick}
+                  className="hover:opacity-75 transition"
+                >
                   <MessageCircle className="w-6 h-6 -rotate-90" />
                 </button>
-                <button type="button" className="hover:opacity-75 transition">
+                <button
+                  type="button"
+                  onClick={() => requireAuth(() => {})}
+                  className="hover:opacity-75 transition"
+                >
                   <Send className="w-5 h-5 -rotate-12" />
                 </button>
               </div>
@@ -235,10 +277,20 @@ export default function PostModal({
             onSubmit={handleAddComment}
             className="flex items-center gap-2 px-3.5 py-3 border-t border-border/60 shrink-0"
           >
-            <Smile className="w-5 h-5 text-muted-foreground shrink-0 cursor-pointer hover:text-foreground transition" />
+            <Smile
+              onClick={handleCommentButtonClick}
+              className="w-5 h-5 text-muted-foreground shrink-0 cursor-pointer hover:text-foreground transition"
+            />
             <input
+              ref={commentInputRef}
               type="text"
               value={commentInput}
+              onFocus={() => {
+                if (!isAuthenticated) {
+                  commentInputRef.current?.blur()
+                  openLoginModal()
+                }
+              }}
               onChange={(e) => setCommentInput(e.target.value)}
               placeholder="Thêm bình luận..."
               className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none border-none py-1"
