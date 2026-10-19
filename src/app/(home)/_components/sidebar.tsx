@@ -4,12 +4,14 @@ import { sidebarLists } from "@/data"
 import { Blocks } from "lucide-react"
 import DisplayIcon from "@/components/ui/display-icon"
 import CreatePost from "@/components/ui/create-post"
+import { NotificationsSheet } from "@/components/notifications/notifications-sheet"
 import { MoreMenu } from "./more-menu"
 import SnapgramLogo from "@/components/logo/SnapgramLogo"
 import SnapgramThumb from "@/components/logo/SnapgramThumb"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
+import { toast } from "sonner"
 
 const Sidebar = () => {
   const pathname = usePathname()
@@ -49,6 +51,30 @@ const Sidebar = () => {
                       <span className="max-xl:hidden text-base font-light">{list.title}</span>
                     </li>
                   </CreatePost>
+                )
+              }
+
+              if (list.title === "Thông báo") {
+                return (
+                  <NotificationsSheet key={listIndex}>
+                    <li className="flex items-center xl:my-1 xl:gap-3 xl:p-3 rounded-lg hover:bg-accent cursor-pointer transition max-xl:p-2 max-xl:justify-center group">
+                      <DisplayIcon list={itemWithAvatar} />
+                      <span className="max-xl:hidden text-base font-light">{list.title}</span>
+                    </li>
+                  </NotificationsSheet>
+                )
+              }
+
+              if (list.title === "Tin nhắn") {
+                return (
+                  <li
+                    key={listIndex}
+                    onClick={() => toast.info("Tính năng Tin nhắn sẽ sớm ra mắt khi có API!")}
+                    className="flex items-center xl:my-1 xl:gap-3 xl:p-3 rounded-lg hover:bg-accent cursor-pointer transition max-xl:p-2 max-xl:justify-center group"
+                  >
+                    <DisplayIcon list={itemWithAvatar} />
+                    <span className="max-xl:hidden text-base font-light">{list.title}</span>
+                  </li>
                 )
               }
 

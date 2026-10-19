@@ -4,6 +4,7 @@ import { Heart, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React from "react";
+import { NotificationsSheet } from "@/components/notifications/notifications-sheet";
 
 const Navbar = () => {
   const router = useRouter();
@@ -55,9 +56,11 @@ const Navbar = () => {
             </div>
           </form>
 
-          <button type="button">
-            <Heart className="w-6 h-6" />
-          </button>
+          <NotificationsSheet>
+            <button type="button" aria-label="Thông báo">
+              <Heart className="w-6 h-6" />
+            </button>
+          </NotificationsSheet>
         </div>
       </div>
     </nav>

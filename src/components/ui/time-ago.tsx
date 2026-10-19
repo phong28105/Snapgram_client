@@ -1,11 +1,15 @@
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, isValid } from "date-fns"
+import { vi } from "date-fns/locale"
 
-const TimeAgo = ({ date, className }: { date: string; className?: string }) => {
+export const TimeAgo = ({ date, className }: { date?: string | null; className?: string }) => {
+  if (!date) return null
+  const parsed = new Date(date)
+  if (!isValid(parsed)) return null
   return (
-    <span className={`${className || ""}`}>
-      {formatDistanceToNow(new Date(date), { addSuffix: true })}
+    <span className={className || ""}>
+      {formatDistanceToNow(parsed, { addSuffix: true, locale: vi })}
     </span>
-  );
-};
+  )
+}
 
-export default TimeAgo;
+export default TimeAgo

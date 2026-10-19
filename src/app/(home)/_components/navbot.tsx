@@ -6,6 +6,7 @@ import CreatePost from "@/components/ui/create-post"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
+import { toast } from "sonner"
 
 const Navbot = () => {
   const pathname = usePathname()
@@ -36,6 +37,18 @@ const Navbot = () => {
                     <DisplayIcon list={itemWithAvatar} />
                   </li>
                 </CreatePost>
+              )
+            }
+
+            if (sidebarList.title === "Tin nhắn") {
+              return (
+                <li
+                  key={sidebarListIndex}
+                  onClick={() => toast.info("Tính năng Tin nhắn sẽ sớm ra mắt khi có API!")}
+                  className="cursor-pointer"
+                >
+                  <DisplayIcon list={itemWithAvatar} />
+                </li>
               )
             }
 

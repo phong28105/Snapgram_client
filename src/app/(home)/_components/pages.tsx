@@ -1,12 +1,47 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import TimeAgo from "@/components/ui/time-ago"
 import { BsThreeDots } from "react-icons/bs"
-import { Bookmark, Heart, MessageCircle, Send, Smile } from "lucide-react"
+import {
+  Bookmark,
+  Camera,
+  Compass,
+  Flag,
+  FolderPlus,
+  Heart,
+  Loader2,
+  MessageCircle,
+  Pencil,
+  Send,
+  Smile,
+  Trash2,
+} from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { useAuth } from "@/hooks/use-auth"
 import { useLoginModal } from "@/components/providers/login-modal-provider"
+import { contentService } from "@/services/content.service"
+import { getErrorMessage } from "@/lib/api"
+import { EditPostDialog } from "@/components/content/edit-post-dialog"
+import { ReportDialog } from "@/components/content/report-dialog"
+import { toast } from "sonner"
+import type { CollectionResponse, ContentVisibility, PostResponse } from "@/types/content.type"
+import { PostMediaCarousel } from "@/components/content/post-media-carousel"
 
 interface CommentItem {
   id: string
@@ -16,85 +51,111 @@ interface CommentItem {
 
 interface PostProps {
   id: string
+  authorId?: string
   author: {
     username: string
     avatar: string
   }
   image: string
+  mediaItems?: Array<{
+    id?: string
+    mediaUrl: string
+    thumbnailUrl?: string
+    mediaType?: string
+  }>
   caption: string
+  tags?: string
+  visibility?: ContentVisibility
   initialLikes: number
+  likedByMe?: boolean
   initialComments: CommentItem[]
+  commentCount?: number
   createdAt: string
+  isReal?: boolean
 }
 
-const mockPosts: PostProps[] = [
-  {
-    id: "post-1",
+function mapPostResponseToCard(
+  p: PostResponse,
+  currentUserId?: string,
+  currentUsername?: string,
+  currentAvatar?: string
+): PostProps {
+  const isMe = Boolean(currentUserId && p.authorId === currentUserId)
+  const firstMedia = p.mediaItems?.[0]?.mediaUrl || p.mediaUrl || "/profile.jpg"
+  return {
+    id: p.id,
+    authorId: p.authorId,
     author: {
-      username: "snapgram_official",
-      avatar: "/profile.jpg",
+      username: isMe
+        ? currentUsername || "me"
+        : `user_${(p.authorId || "snap").slice(0, 6)}`,
+      avatar: isMe && currentAvatar ? currentAvatar : "/profile.jpg",
     },
-    image: "/profile.jpg",
-    caption: "Chào mừng bạn đến với Snapgram! Nơi chia sẻ những khoảnh khắc tuyệt vời nhất 📸✨",
-    initialLikes: 1420,
-    initialComments: [
-      { id: "c1", username: "alex_dev", text: "Giao diện mượt mà và đẹp quá!" },
-      { id: "c2", username: "sarah_travel", text: "Thích thiết kế tối giản phong cách Instagram này ❤️" },
-    ],
-    createdAt: "2025-01-01T00:00:00Z",
-  },
-  {
-    id: "post-2",
-    author: {
-      username: "designer_vibes",
-      avatar: "/profile.jpg",
-    },
-    image: "/profile.jpg",
-    caption: "Màu hoàng hôn chiều nay qua góc nhìn ống kính mới 🌅",
-    initialLikes: 890,
-    initialComments: [
-      { id: "c3", username: "huyen_tran", text: "Tone màu ấm áp quá!" },
-    ],
-    createdAt: "2025-01-02T12:00:00Z",
-  },
-  {
-    id: "post-3",
-    author: {
-      username: "daily_photography",
-      avatar: "/profile.jpg",
-    },
-    image: "/profile.jpg",
-    caption: "Minimalist street style. Đôi khi sự đơn giản chính là điểm nhấn tinh tế nhất.",
-    initialLikes: 2541,
-    initialComments: [
-      { id: "c4", username: "khoi_nguyen", text: "Góc chụp đỉnh chóp luôn bạn ơi!" },
-    ],
-    createdAt: "2025-01-03T08:30:00Z",
-  },
-]
+    image: firstMedia,
+    mediaItems: p.mediaItems && p.mediaItems.length > 0 ? p.mediaItems : [{ mediaUrl: firstMedia }],
+    caption: p.caption || "",
+    tags: p.tags,
+    visibility: p.visibility,
+    initialLikes: p.likeCount ?? 0,
+    likedByMe: p.likedByMe ?? false,
+    initialComments: [],
+    commentCount: p.commentCount ?? 0,
+    createdAt: p.createdAt || new Date().toISOString(),
+    isReal: true,
+  }
+}
 
-function PostCard({ post }: { post: PostProps }) {
+function PostCard({
+  post,
+  onPostUpdated,
+  onPostDeleted,
+}: {
+  post: PostProps
+  onPostUpdated: (id: string, updated: PostResponse) => void
+  onPostDeleted: (id: string) => void
+}) {
   const { user, isAuthenticated } = useAuth()
   const { openLoginModal } = useLoginModal()
 
-  const [isLiked, setIsLiked] = useState(false)
+  const [isLiked, setIsLiked] = useState(Boolean(post.likedByMe))
   const [likesCount, setLikesCount] = useState(post.initialLikes)
   const [isBookmarked, setIsBookmarked] = useState(false)
   const [comments, setComments] = useState<CommentItem[]>(post.initialComments)
   const [commentInput, setCommentInput] = useState("")
   const [showHeartPop, setShowHeartPop] = useState(false)
 
-  const handleToggleLike = () => {
+  // Modals state
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [isReportOpen, setIsReportOpen] = useState(false)
+  const [isCollectionOpen, setIsCollectionOpen] = useState(false)
+  const [collections, setCollections] = useState<CollectionResponse[]>([])
+  const [newCollectionName, setNewCollectionName] = useState("")
+
+  const isOwner = Boolean(
+    user &&
+      ((post.authorId && post.authorId === user.id) ||
+        post.author.username === user.username)
+  )
+
+  const handleToggleLike = async () => {
     if (!isAuthenticated) {
       openLoginModal()
       return
     }
-    if (isLiked) {
-      setIsLiked(false)
-      setLikesCount((prev) => Math.max(0, prev - 1))
-    } else {
-      setIsLiked(true)
-      setLikesCount((prev) => prev + 1)
+    const nextLiked = !isLiked
+    setIsLiked(nextLiked)
+    setLikesCount((prev) => (nextLiked ? prev + 1 : Math.max(0, prev - 1)))
+
+    if (post.isReal) {
+      try {
+        if (nextLiked) {
+          await contentService.interactPost(post.id, { type: "LIKE" })
+        } else {
+          await contentService.unlikePost(post.id)
+        }
+      } catch {
+        // Optimistic UI fallback
+      }
     }
   }
 
@@ -106,20 +167,107 @@ function PostCard({ post }: { post: PostProps }) {
     if (!isLiked) {
       setIsLiked(true)
       setLikesCount((prev) => prev + 1)
+      if (post.isReal) {
+        contentService.interactPost(post.id, { type: "LIKE" }).catch(() => {})
+      }
     }
     setShowHeartPop(true)
     setTimeout(() => setShowHeartPop(false), 900)
   }
 
-  const handleToggleBookmark = () => {
+  const handleToggleBookmark = async () => {
     if (!isAuthenticated) {
       openLoginModal()
       return
     }
-    setIsBookmarked((prev) => !prev)
+    const nextSaved = !isBookmarked
+    setIsBookmarked(nextSaved)
+
+    if (post.isReal) {
+      try {
+        if (nextSaved) {
+          await contentService.savePost(post.id)
+          await contentService.interactPost(post.id, { type: "SAVE" }).catch(() => {})
+          toast.success("Đã lưu bài viết!")
+        } else {
+          await contentService.unsavePost(post.id)
+          toast.success("Đã bỏ lưu bài viết.")
+        }
+      } catch {
+        // Keep optimistic state
+      }
+    } else {
+      toast.success(nextSaved ? "Đã lưu bài viết!" : "Đã bỏ lưu bài viết.")
+    }
   }
 
-  const handleAddComment = (e: React.FormEvent) => {
+  const handleOpenSaveToCollection = async () => {
+    if (!isAuthenticated) {
+      openLoginModal()
+      return
+    }
+    setIsCollectionOpen(true)
+    try {
+      const list = await contentService.getMyCollections()
+      setCollections(list || [])
+    } catch {
+      setCollections([])
+    }
+  }
+
+  const handleSaveIntoCollection = async (collectionId?: string) => {
+    try {
+      if (post.isReal) {
+        await contentService.savePost(post.id, { collectionId })
+      }
+      setIsBookmarked(true)
+      setIsCollectionOpen(false)
+      toast.success("Đã lưu bài viết vào bộ sưu tập!")
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Không thể lưu vào bộ sưu tập."))
+    }
+  }
+
+  const handleCreateCollectionAndSave = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newCollectionName.trim()) return
+    try {
+      const created = await contentService.createCollection({
+        name: newCollectionName.trim(),
+        private: true,
+      })
+      setCollections((prev) => [created, ...prev])
+      setNewCollectionName("")
+      await handleSaveIntoCollection(created.id)
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Không thể tạo bộ sưu tập mới."))
+    }
+  }
+
+  const handleSharePost = () => {
+    const shareUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/p/${post.id}`
+        : `/p/${post.id}`
+
+    if (post.isReal && isAuthenticated) {
+      contentService.interactPost(post.id, { type: "SHARE" }).catch(() => {})
+    }
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      navigator
+        .share({
+          title: post.author.username,
+          url: shareUrl,
+        })
+        .catch(() => {})
+    } else if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(shareUrl).catch(() => {})
+      toast.success("Đã sao chép liên kết bài viết!")
+    }
+  }
+
+  const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!commentInput.trim()) return
 
@@ -128,61 +276,141 @@ function PostCard({ post }: { post: PostProps }) {
       return
     }
 
-    const newComment: CommentItem = {
+    const content = commentInput.trim()
+    setCommentInput("")
+
+    const optimistic: CommentItem = {
       id: Date.now().toString(),
       username: user?.username || "me",
-      text: commentInput.trim(),
+      text: content,
     }
+    setComments((prev) => [...prev, optimistic])
 
-    setComments((prev) => [...prev, newComment])
-    setCommentInput("")
+    if (post.isReal) {
+      try {
+        await contentService.createComment(post.id, { content })
+      } catch (err) {
+        toast.error(getErrorMessage(err, "Không thể gửi bình luận."))
+      }
+    }
   }
+
+  const handleDeleteDirect = async () => {
+    if (!post.isReal) {
+      onPostDeleted(post.id)
+      toast.success("Đã ẩn bài viết.")
+      return
+    }
+    try {
+      await contentService.deletePost(post.id)
+      onPostDeleted(post.id)
+      toast.success("Đã xóa bài viết.")
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Không thể xóa bài viết."))
+    }
+  }
+
+  const totalCommentsCount = Math.max(
+    post.commentCount ?? 0,
+    comments.length
+  )
 
   return (
     <div className="flex flex-col border-b border-border/60 pb-5 pt-3">
       {/* Header: Author info & options */}
       <div className="flex items-center justify-between py-2 px-1">
         <div className="flex items-center gap-3">
-          <div className="p-[2px] rounded-full bg-gradient-to-tr from-amber-400 via-rose-500 to-fuchsia-600">
+          <Link
+            href={`/u/${post.author.username}`}
+            className="p-[2px] rounded-full bg-gradient-to-tr from-amber-400 via-rose-500 to-fuchsia-600"
+          >
             <img
               src={post.author.avatar}
               alt={post.author.username}
               className="w-8 h-8 rounded-full object-cover bg-background p-0.5 select-none"
             />
-          </div>
+          </Link>
           <div className="flex items-center gap-1.5 text-xs">
-            <span className="font-semibold text-foreground tracking-tight hover:underline cursor-pointer">
+            <Link
+              href={`/u/${post.author.username}`}
+              className="font-semibold text-foreground tracking-tight hover:underline cursor-pointer"
+            >
               {post.author.username}
-            </span>
+            </Link>
             <span className="text-muted-foreground">•</span>
             <TimeAgo date={post.createdAt} className="text-muted-foreground" />
           </div>
         </div>
 
-        <button type="button" className="text-muted-foreground hover:text-foreground transition p-1">
-          <BsThreeDots className="size-4" />
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground transition p-1"
+              aria-label="Tùy chọn bài viết"
+            >
+              <BsThreeDots className="size-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onClick={handleOpenSaveToCollection} className="text-xs gap-2 cursor-pointer">
+              <FolderPlus className="w-3.5 h-3.5" />
+              <span>Lưu vào bộ sưu tập</span>
+            </DropdownMenuItem>
+
+            {isOwner ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setIsEditOpen(true)}
+                  className="text-xs gap-2 cursor-pointer"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span>Chỉnh sửa bài viết</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleDeleteDirect}
+                  className="text-xs gap-2 text-destructive focus:text-destructive cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Xóa bài viết</span>
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    if (!isAuthenticated) {
+                      openLoginModal()
+                      return
+                    }
+                    setIsReportOpen(true)
+                  }}
+                  className="text-xs gap-2 text-destructive focus:text-destructive cursor-pointer"
+                >
+                  <Flag className="w-3.5 h-3.5" />
+                  <span>Báo cáo vi phạm</span>
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-      {/* Post Image with Double Tap Heart effect */}
-      <div
-        className="relative aspect-square w-full rounded-md overflow-hidden bg-muted/40 cursor-pointer select-none"
-        onDoubleClick={handleDoubleTap}
-      >
-        <Link href={`/p/${post.id}`} scroll={false}>
-          <img
-            src={post.image}
-            alt={post.caption}
-            className="w-full h-full object-cover transition-transform duration-200"
-          />
-        </Link>
-
-        {showHeartPop && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none animate-in fade-in zoom-in-50 duration-200">
-            <Heart className="w-24 h-24 text-white fill-white drop-shadow-xl animate-pulse" />
-          </div>
-        )}
-      </div>
+      {/* Post Media Carousel with arrows, pagination dots and double-tap heart */}
+      <PostMediaCarousel
+        items={
+          post.mediaItems && post.mediaItems.length > 0
+            ? post.mediaItems
+            : [{ mediaUrl: post.image }]
+        }
+        alt={post.caption}
+        aspectRatioClassName="aspect-square"
+        onDoubleTap={handleDoubleTap}
+        showHeartPop={showHeartPop}
+        linkHref={`/p/${post.id}`}
+      />
 
       {/* Action Buttons: Like, Comment, Share, Bookmark */}
       <div className="flex items-center justify-between pt-3 pb-1 px-1">
@@ -211,14 +439,7 @@ function PostCard({ post }: { post: PostProps }) {
 
           <button
             type="button"
-            onClick={() => {
-              if (navigator.share) {
-                navigator.share({
-                  title: post.author.username,
-                  url: window.location.origin + `/p/${post.id}`,
-                }).catch(() => {})
-              }
-            }}
+            onClick={handleSharePost}
             className="hover:opacity-75 transition text-foreground"
             aria-label="Chia sẻ"
           >
@@ -247,18 +468,23 @@ function PostCard({ post }: { post: PostProps }) {
 
       {/* Caption */}
       <div className="px-1 text-xs mt-1 leading-relaxed">
-        <span className="font-semibold mr-1.5">{post.author.username}</span>
+        <Link
+          href={`/u/${post.author.username}`}
+          className="font-semibold mr-1.5 hover:underline"
+        >
+          {post.author.username}
+        </Link>
         <span className="text-foreground/90">{post.caption}</span>
       </div>
 
       {/* View Comments Link */}
-      {comments.length > 0 && (
+      {totalCommentsCount > 0 && (
         <Link
           href={`/p/${post.id}`}
           scroll={false}
           className="px-1 text-xs text-muted-foreground mt-1 hover:text-foreground transition block"
         >
-          Xem tất cả {comments.length} bình luận
+          Xem tất cả {totalCommentsCount} bình luận
         </Link>
       )}
 
@@ -273,7 +499,10 @@ function PostCard({ post }: { post: PostProps }) {
       </div>
 
       {/* Inline Comment Input Form */}
-      <form onSubmit={handleAddComment} className="flex items-center gap-2 mt-2 pt-2 border-t border-border/40 px-1">
+      <form
+        onSubmit={handleAddComment}
+        className="flex items-center gap-2 mt-2 pt-2 border-t border-border/40 px-1"
+      >
         <Smile className="w-4 h-4 text-muted-foreground shrink-0" />
         <input
           type="text"
@@ -291,15 +520,206 @@ function PostCard({ post }: { post: PostProps }) {
           </button>
         )}
       </form>
+
+      {/* Edit Post Modal */}
+      <EditPostDialog
+        open={isEditOpen}
+        onOpenChange={setIsEditOpen}
+        postId={post.id}
+        initialCaption={post.caption}
+        initialTags={post.tags}
+        initialVisibility={post.visibility}
+        onUpdated={(updated) => onPostUpdated(post.id, updated)}
+        onDeleted={(deletedId) => onPostDeleted(deletedId)}
+      />
+
+      {/* Report Post Modal */}
+      <ReportDialog
+        open={isReportOpen}
+        onOpenChange={setIsReportOpen}
+        targetType="POST"
+        targetId={post.id}
+        targetLabel={`@${post.author.username}`}
+      />
+
+      {/* Save to Collection Dialog */}
+      <Dialog open={isCollectionOpen} onOpenChange={setIsCollectionOpen}>
+        <DialogContent className="sm:max-w-[380px] rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-bold">
+              Lưu vào bộ sưu tập
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="max-h-48 overflow-y-auto divide-y divide-border/40">
+              <button
+                type="button"
+                onClick={() => handleSaveIntoCollection(undefined)}
+                className="w-full flex items-center justify-between py-2.5 px-2 hover:bg-muted/50 rounded-lg text-xs font-medium transition"
+              >
+                <span>Tất cả bài viết đã lưu</span>
+                <Bookmark className="w-3.5 h-3.5 text-primary" />
+              </button>
+
+              {collections.map((col) => (
+                <button
+                  key={col.id}
+                  type="button"
+                  onClick={() => handleSaveIntoCollection(col.id)}
+                  className="w-full flex items-center justify-between py-2.5 px-2 hover:bg-muted/50 rounded-lg text-xs font-medium transition"
+                >
+                  <span>{col.name}</span>
+                  <FolderPlus className="w-3.5 h-3.5 text-muted-foreground" />
+                </button>
+              ))}
+            </div>
+
+            <form
+              onSubmit={handleCreateCollectionAndSave}
+              className="flex items-center gap-2 pt-2 border-t border-border/50"
+            >
+              <Input
+                value={newCollectionName}
+                onChange={(e) => setNewCollectionName(e.target.value)}
+                placeholder="Tên bộ sưu tập mới..."
+                className="h-8 text-xs"
+              />
+              <Button
+                type="submit"
+                size="sm"
+                disabled={!newCollectionName.trim()}
+                className="h-8 text-xs shrink-0"
+              >
+                Tạo & Lưu
+              </Button>
+            </form>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
 
 export default function Pages() {
+  const { user, isAuthenticated } = useAuth()
+  const [posts, setPosts] = useState<PostProps[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  const loadFeed = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const feedRes = isAuthenticated
+        ? await contentService.getFeedPosts(0, 20)
+        : await contentService.getExplorePosts(0, 20)
+
+      let items = feedRes.content || []
+      if (items.length === 0) {
+        const exploreRes = await contentService.getExplorePosts(0, 20)
+        items = exploreRes.content || []
+      }
+
+      const mapped = items.map((p) =>
+        mapPostResponseToCard(p, user?.id, user?.username, user?.avatarUrl)
+      )
+      setPosts(mapped)
+    } catch {
+      setPosts([])
+    } finally {
+      setIsLoading(false)
+    }
+  }, [isAuthenticated, user?.id, user?.username, user?.avatarUrl])
+
+  useEffect(() => {
+    loadFeed()
+  }, [loadFeed])
+
+  useEffect(() => {
+    const handlePostCreated = () => {
+      loadFeed()
+    }
+    window.addEventListener("snapgram:post-created", handlePostCreated)
+    return () =>
+      window.removeEventListener("snapgram:post-created", handlePostCreated)
+  }, [loadFeed])
+
+  const handlePostUpdated = (id: string, updated: PostResponse) => {
+    setPosts((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              caption: updated.caption ?? item.caption,
+              tags: updated.tags ?? item.tags,
+              visibility: updated.visibility ?? item.visibility,
+            }
+          : item
+      )
+    )
+  }
+
+  const handlePostDeleted = (id: string) => {
+    setPosts((prev) => prev.filter((item) => item.id !== id))
+  }
+
+  if (isLoading) {
+    return (
+      <div className="w-full max-w-[470px] mx-auto space-y-6 pt-2">
+        {[1, 2].map((i) => (
+          <div key={i} className="border-b border-border/60 pb-5 space-y-3 animate-pulse">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-muted" />
+              <div className="space-y-1.5 flex-1">
+                <div className="h-3 w-28 bg-muted rounded" />
+                <div className="h-2 w-16 bg-muted rounded" />
+              </div>
+            </div>
+            <div className="aspect-square w-full rounded-md bg-muted" />
+            <div className="flex items-center gap-4 pt-1">
+              <div className="w-6 h-6 rounded-full bg-muted" />
+              <div className="w-6 h-6 rounded-full bg-muted" />
+              <div className="w-6 h-6 rounded-full bg-muted" />
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  if (posts.length === 0) {
+    return (
+      <div className="w-full max-w-[470px] mx-auto py-16 px-4 text-center space-y-4">
+        <div className="w-16 h-16 rounded-full border-2 border-dashed border-border flex items-center justify-center mx-auto text-muted-foreground">
+          <Camera className="w-8 h-8 opacity-70" />
+        </div>
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold text-foreground">
+            Chưa có bài viết mới
+          </h3>
+          <p className="text-xs text-muted-foreground max-w-sm mx-auto leading-relaxed">
+            Hãy theo dõi thêm người dùng mới hoặc bấm nút tạo bài viết để chia sẻ khoảnh khắc đầu tiên của bạn!
+          </p>
+        </div>
+        <Link
+          href="/explore"
+          className="inline-flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition"
+        >
+          <Compass className="w-4 h-4" />
+          <span>Khám phá mọi người</span>
+        </Link>
+      </div>
+    )
+  }
+
   return (
     <div className="w-full max-w-[470px] mx-auto space-y-2">
-      {mockPosts.map((post) => (
-        <PostCard key={post.id} post={post} />
+      {posts.map((post) => (
+        <PostCard
+          key={post.id}
+          post={post}
+          onPostUpdated={handlePostUpdated}
+          onPostDeleted={handlePostDeleted}
+        />
       ))}
     </div>
   )
