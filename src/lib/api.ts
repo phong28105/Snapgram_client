@@ -83,7 +83,8 @@ apiClient.interceptors.response.use(
     } catch (refreshError) {
       // Refresh thất bại: phiên đã hết, đưa về trang login
       if (typeof window !== "undefined" && !AUTH_PAGES.includes(window.location.pathname)) {
-        window.location.href = "/login"
+        const redirectTo = `${window.location.pathname}${window.location.search}`
+        window.location.href = `/login?redirect=${encodeURIComponent(redirectTo)}`
       }
       return Promise.reject(refreshError)
     }

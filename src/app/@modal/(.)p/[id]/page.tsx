@@ -7,6 +7,7 @@ import { Bookmark, Heart, MessageCircle, Send, Smile, MoreHorizontal } from "luc
 import TimeAgo from "@/components/ui/time-ago"
 import { useAuth } from "@/hooks/use-auth"
 import { useLoginModal } from "@/components/providers/login-modal-provider"
+import { VerifiedBadge } from "@/components/ui/verified-badge"
 
 interface CommentItem {
   id: string
@@ -14,6 +15,8 @@ interface CommentItem {
   avatar: string
   text: string
   createdAt: string
+  verified?: boolean
+  verifiedUntil?: string
 }
 
 export default function PostModal({
@@ -38,6 +41,7 @@ export default function PostModal({
       avatar: "/profile.jpg",
       text: "Giao diện mượt mà và đẹp quá!",
       createdAt: "2025-01-01T02:00:00Z",
+      verified: true,
     },
     {
       id: "c2",
@@ -112,6 +116,8 @@ export default function PostModal({
       avatar: user?.avatarUrl || "/profile.jpg",
       text: commentInput.trim(),
       createdAt: new Date().toISOString(),
+      verified: user?.verified,
+      verifiedUntil: user?.verifiedUntil,
     }
 
     setComments((prev) => [...prev, newComment])
@@ -156,6 +162,7 @@ export default function PostModal({
               </div>
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-xs tracking-tight">snapgram_official</span>
+                <VerifiedBadge verified size={13} />
                 <span className="text-xs text-muted-foreground">•</span>
                 <button
                   type="button"
@@ -187,7 +194,10 @@ export default function PostModal({
               />
               <div className="space-y-1">
                 <p className="leading-relaxed">
-                  <span className="font-semibold mr-1.5">snapgram_official</span>
+                  <span className="font-semibold mr-1.5 inline-flex items-center gap-1">
+                    snapgram_official
+                    <VerifiedBadge verified size={12} />
+                  </span>
                   Chào mừng bạn đến với Snapgram! Nơi chia sẻ những khoảnh khắc tuyệt vời nhất 📸✨
                 </p>
                 <span className="text-[11px] text-muted-foreground block">1 ngày trước</span>
@@ -204,7 +214,14 @@ export default function PostModal({
                 />
                 <div className="space-y-1 flex-1">
                   <p className="leading-relaxed">
-                    <span className="font-semibold mr-1.5">{comment.username}</span>
+                    <span className="font-semibold mr-1.5 inline-flex items-center gap-1">
+                      {comment.username}
+                      <VerifiedBadge
+                        verified={comment.verified}
+                        verifiedUntil={comment.verifiedUntil}
+                        size={12}
+                      />
+                    </span>
                     {comment.text}
                   </p>
                   <div className="flex items-center gap-3 text-[11px] text-muted-foreground">

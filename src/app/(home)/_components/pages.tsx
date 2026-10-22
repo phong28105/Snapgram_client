@@ -7,11 +7,14 @@ import { BsThreeDots } from "react-icons/bs"
 import { Bookmark, Heart, MessageCircle, Send, Smile } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import { useLoginModal } from "@/components/providers/login-modal-provider"
+import { VerifiedBadge } from "@/components/ui/verified-badge"
 
 interface CommentItem {
   id: string
   username: string
   text: string
+  verified?: boolean
+  verifiedUntil?: string
 }
 
 interface PostProps {
@@ -19,6 +22,8 @@ interface PostProps {
   author: {
     username: string
     avatar: string
+    verified?: boolean
+    verifiedUntil?: string
   }
   image: string
   caption: string
@@ -33,13 +38,14 @@ const mockPosts: PostProps[] = [
     author: {
       username: "snapgram_official",
       avatar: "/profile.jpg",
+      verified: true,
     },
     image: "/profile.jpg",
     caption: "Chào mừng bạn đến với Snapgram! Nơi chia sẻ những khoảnh khắc tuyệt vời nhất 📸✨",
     initialLikes: 1420,
     initialComments: [
       { id: "c1", username: "alex_dev", text: "Giao diện mượt mà và đẹp quá!" },
-      { id: "c2", username: "sarah_travel", text: "Thích thiết kế tối giản phong cách Instagram này ❤️" },
+      { id: "c2", username: "sarah_travel", text: "Thích thiết kế tối giản phong cách Instagram này ❤️", verified: true },
     ],
     createdAt: "2025-01-01T00:00:00Z",
   },
@@ -48,6 +54,7 @@ const mockPosts: PostProps[] = [
     author: {
       username: "designer_vibes",
       avatar: "/profile.jpg",
+      verified: true,
     },
     image: "/profile.jpg",
     caption: "Màu hoàng hôn chiều nay qua góc nhìn ống kính mới 🌅",
@@ -132,6 +139,8 @@ function PostCard({ post }: { post: PostProps }) {
       id: Date.now().toString(),
       username: user?.username || "me",
       text: commentInput.trim(),
+      verified: user?.verified,
+      verifiedUntil: user?.verifiedUntil,
     }
 
     setComments((prev) => [...prev, newComment])
@@ -154,6 +163,11 @@ function PostCard({ post }: { post: PostProps }) {
             <span className="font-semibold text-foreground tracking-tight hover:underline cursor-pointer">
               {post.author.username}
             </span>
+            <VerifiedBadge
+              verified={post.author.verified}
+              verifiedUntil={post.author.verifiedUntil}
+              size={13}
+            />
             <span className="text-muted-foreground">•</span>
             <TimeAgo date={post.createdAt} className="text-muted-foreground" />
           </div>
@@ -247,7 +261,14 @@ function PostCard({ post }: { post: PostProps }) {
 
       {/* Caption */}
       <div className="px-1 text-xs mt-1 leading-relaxed">
-        <span className="font-semibold mr-1.5">{post.author.username}</span>
+        <span className="font-semibold mr-1.5 inline-flex items-center gap-1">
+          {post.author.username}
+          <VerifiedBadge
+            verified={post.author.verified}
+            verifiedUntil={post.author.verifiedUntil}
+            size={12}
+          />
+        </span>
         <span className="text-foreground/90">{post.caption}</span>
       </div>
 
@@ -266,7 +287,10 @@ function PostCard({ post }: { post: PostProps }) {
       <div className="px-1 space-y-1 mt-1 text-xs">
         {comments.slice(-2).map((c) => (
           <div key={c.id} className="leading-tight">
-            <span className="font-semibold mr-1.5">{c.username}</span>
+            <span className="font-semibold mr-1.5 inline-flex items-center gap-1">
+              {c.username}
+              <VerifiedBadge verified={c.verified} verifiedUntil={c.verifiedUntil} size={12} />
+            </span>
             <span className="text-foreground/90">{c.text}</span>
           </div>
         ))}

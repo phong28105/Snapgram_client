@@ -6,6 +6,7 @@ import { Bookmark, ChevronLeft, Heart, MessageCircle, Music2, Play, Send, Volume
 import SnapgramLogo from "@/components/logo/SnapgramLogo"
 import { useAuth } from "@/hooks/use-auth"
 import { useLoginModal } from "@/components/providers/login-modal-provider"
+import { VerifiedBadge } from "@/components/ui/verified-badge"
 import { toast } from "sonner"
 
 export default function ReelPage({
@@ -52,7 +53,14 @@ export default function ReelPage({
 
         <div>
           {isAuthenticated ? (
-            <span className="text-xs text-muted-foreground">@{user?.username}</span>
+            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+              @{user?.username}
+              <VerifiedBadge
+                verified={user?.verified}
+                verifiedUntil={user?.verifiedUntil}
+                size={13}
+              />
+            </span>
           ) : (
             <button
               type="button"
@@ -111,7 +119,10 @@ export default function ReelPage({
                   alt="street_vibes"
                   className="w-8 h-8 rounded-full object-cover border border-white/60 p-0.5"
                 />
-                <span className="font-semibold text-xs">street_vibes</span>
+                <span className="font-semibold text-xs inline-flex items-center gap-1">
+                  street_vibes
+                  <VerifiedBadge verified size={13} />
+                </span>
                 <button
                   type="button"
                   onClick={() => requireAuth(() => setIsFollowing((p) => !p))}

@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Menu, Settings, Activity, Bookmark, AlertCircle, LogOut, User } from "lucide-react"
+import Link from "next/link"
+import { Menu, Settings, Activity, Bookmark, AlertCircle, LogOut, User, BadgeCheck } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { ModeToggle } from "@/components/ui/mode-toggle"
 import { useAuth } from "@/hooks/use-auth"
@@ -38,6 +39,12 @@ export function MoreMenu() {
             className="flex items-center gap-3 py-3 px-3 rounded-lg cursor-pointer"
           >
             <Settings className="w-5 h-5" /><span className="text-base font-light">Cài đặt</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild className="flex items-center gap-3 py-3 px-3 rounded-lg cursor-pointer">
+            <Link href="/verified">
+              <BadgeCheck className="w-5 h-5 text-sky-500" />
+              <span className="text-base font-light">Snapgram Verified</span>
+            </Link>
           </DropdownMenuItem>
           <DropdownMenuItem className="flex items-center gap-3 py-3 px-3 rounded-lg cursor-pointer">
             <Activity className="w-5 h-5" /><span className="text-base font-light">Hoạt động của bạn</span>

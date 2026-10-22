@@ -4,6 +4,7 @@ import { profiles, siderightFooterLists } from "@/data";
 import { useAuth } from "@/hooks/use-auth";
 import { useLoginModal } from "@/components/providers/login-modal-provider";
 import Link from "next/link";
+import { VerifiedBadge } from "@/components/ui/verified-badge";
 
 const Sideright = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -24,7 +25,14 @@ const Sideright = () => {
                 className="w-[44px] h-[44px] object-cover rounded-full"
               />
               <div className="flex flex-col">
-                <h6 className="text-xs font-bold tracking-tighter">{user.username}</h6>
+                <div className="flex items-center gap-1">
+                  <h6 className="text-xs font-bold tracking-tighter">{user.username}</h6>
+                  <VerifiedBadge
+                    verified={user.verified}
+                    verifiedUntil={user.verifiedUntil}
+                    size={13}
+                  />
+                </div>
                 <span className="text-[11px] text-muted-foreground truncate max-w-[140px]">{user.displayName || user.email}</span>
               </div>
             </Link>
@@ -106,7 +114,13 @@ const Sideright = () => {
                 key={list}
                 className="cursor-pointer hover:underline text-muted-foreground text-xs"
               >
-                {list}
+                {list === "Meta Verified" ? (
+                  <Link href="/verified" className="hover:underline">
+                    {list}
+                  </Link>
+                ) : (
+                  list
+                )}
                 {listIndex !== siderightFooterLists.length - 1 ? "," : ""}
               </li>
             ))}

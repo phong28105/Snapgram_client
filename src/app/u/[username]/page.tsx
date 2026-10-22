@@ -8,6 +8,7 @@ import Sidebar from "@/app/(home)/_components/sidebar"
 import Navbot from "@/app/(home)/_components/navbot"
 import Navbar from "@/app/(home)/_components/navbar"
 import { Button } from "@/components/ui/button"
+import { VerifiedBadge } from "@/components/ui/verified-badge"
 import { useAuth } from "@/hooks/use-auth"
 import { useLoginModal } from "@/components/providers/login-modal-provider"
 import { AvatarActionsDialog } from "@/components/profile/avatar-actions-dialog"
@@ -143,6 +144,10 @@ export default function PublicUserProfilePage({
                     <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">
                       {profile?.username}
                     </h1>
+                    <VerifiedBadge
+                      verified={profile?.verified}
+                      verifiedUntil={profile?.verifiedUntil}
+                    />
                     {profile?.privateAccount && <Lock className="w-4 h-4 text-muted-foreground" />}
                   </div>
 

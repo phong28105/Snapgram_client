@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { useLoginModal } from "@/components/providers/login-modal-provider"
 import { mediaService } from "@/services/media.service"
 import { getErrorMessage } from "@/lib/api"
+import { VerifiedBadge } from "@/components/ui/verified-badge"
 
 interface CreatePostProps {
   children: React.ReactNode
@@ -192,8 +193,13 @@ const CreatePost: React.FC<CreatePostProps> = ({ children }) => {
                   alt={user?.username || "profile"}
                   className="w-8 h-8 rounded-full object-cover"
                 />
-                <span className="text-xs font-semibold">
+                <span className="inline-flex items-center gap-1 text-xs font-semibold">
                   {user?.username || "me"}
+                  <VerifiedBadge
+                    verified={user?.verified}
+                    verifiedUntil={user?.verifiedUntil}
+                    size={13}
+                  />
                 </span>
               </div>
 

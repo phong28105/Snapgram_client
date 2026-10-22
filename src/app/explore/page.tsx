@@ -16,6 +16,7 @@ import {
 import Sidebar from "@/app/(home)/_components/sidebar"
 import Navbot from "@/app/(home)/_components/navbot"
 import Navbar from "@/app/(home)/_components/navbar"
+import { VerifiedBadge } from "@/components/ui/verified-badge"
 import { userService } from "@/services/user.service"
 import type { UserProfileResponse } from "@/types/user.type"
 
@@ -238,9 +239,16 @@ function ExploreContent() {
                         className="w-10 h-10 rounded-full object-cover bg-muted shrink-0"
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold text-foreground truncate">
-                          {u.username}
-                        </p>
+                        <div className="flex items-center gap-1 min-w-0">
+                          <p className="text-xs font-semibold text-foreground truncate">
+                            {u.username}
+                          </p>
+                          <VerifiedBadge
+                            verified={u.verified}
+                            verifiedUntil={u.verifiedUntil}
+                            size={13}
+                          />
+                        </div>
                         <p className="text-[11px] text-muted-foreground truncate">
                           {u.displayName || u.category || "Người dùng Snapgram"}
                         </p>
@@ -280,9 +288,16 @@ function ExploreContent() {
                           className="w-9 h-9 rounded-full object-cover bg-muted shrink-0"
                         />
                         <div className="min-w-0">
-                          <p className="text-xs font-semibold text-foreground truncate">
-                            {u.username}
-                          </p>
+                          <div className="flex items-center gap-1 min-w-0">
+                            <p className="text-xs font-semibold text-foreground truncate">
+                              {u.username}
+                            </p>
+                            <VerifiedBadge
+                              verified={u.verified}
+                              verifiedUntil={u.verifiedUntil}
+                              size={13}
+                            />
+                          </div>
                           <p className="text-[11px] text-muted-foreground truncate">
                             {u.displayName || "Người dùng Snapgram"}
                           </p>

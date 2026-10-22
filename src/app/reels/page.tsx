@@ -18,6 +18,7 @@ import Navbot from "@/app/(home)/_components/navbot"
 import Navbar from "@/app/(home)/_components/navbar"
 import { useAuth } from "@/hooks/use-auth"
 import { useLoginModal } from "@/components/providers/login-modal-provider"
+import { VerifiedBadge } from "@/components/ui/verified-badge"
 import { toast } from "sonner"
 
 interface ReelItem {
@@ -25,6 +26,8 @@ interface ReelItem {
   author: {
     username: string
     avatar: string
+    verified?: boolean
+    verifiedUntil?: string
   }
   caption: string
   audio: string
@@ -39,6 +42,7 @@ const mockReels: ReelItem[] = [
     author: {
       username: "street_vibes",
       avatar: "/profile.jpg",
+      verified: true,
     },
     caption: "Nhịp sống về đêm qua ống kính góc rộng 🌃✨ #snapgram #reels #nightlife",
     audio: "Âm thanh gốc - street_vibes · Lo-fi Chill Beats",
@@ -51,6 +55,7 @@ const mockReels: ReelItem[] = [
     author: {
       username: "travel_addict",
       avatar: "/profile.jpg",
+      verified: true,
     },
     caption: "Bình minh trên đỉnh Tà Xùa. Biển mây bồng bềnh tuyệt đẹp! ☁️🏔️",
     audio: "Âm thanh gốc - travel_addict · Acoustic Morning",
@@ -180,8 +185,13 @@ export default function ReelsPage() {
                     alt={currentReel.author.username}
                     className="w-8 h-8 rounded-full object-cover border border-white/60 p-0.5"
                   />
-                  <span className="font-semibold text-xs tracking-tight">
+                  <span className="font-semibold text-xs tracking-tight inline-flex items-center gap-1">
                     {currentReel.author.username}
+                    <VerifiedBadge
+                      verified={currentReel.author.verified}
+                      verifiedUntil={currentReel.author.verifiedUntil}
+                      size={13}
+                    />
                   </span>
                   <button
                     type="button"
