@@ -46,6 +46,8 @@ function parseNotificationMessage(item: NotificationResponse): string {
       return "đã thích bài viết của bạn."
     case "COMMENT":
       return "đã bình luận về bài viết của bạn."
+    case "REPLY":
+      return "đã trả lời bình luận của bạn."
     case "FOLLOW":
       return "đã bắt đầu theo dõi bạn."
     case "MENTION":
@@ -318,10 +320,13 @@ export function NotificationsSheet({ children }: NotificationsSheetProps) {
                       {item.type === "COMMENT" && (
                         <MessageCircle className="w-2.5 h-2.5 text-primary fill-primary" />
                       )}
+                      {item.type === "REPLY" && (
+                        <MessageCircle className="w-2.5 h-2.5 text-sky-500 fill-sky-500" />
+                      )}
                       {item.type === "FOLLOW" && (
                         <UserPlus className="w-2.5 h-2.5 text-emerald-500" />
                       )}
-                      {item.type !== "LIKE" && item.type !== "COMMENT" && item.type !== "FOLLOW" && (
+                      {item.type !== "LIKE" && item.type !== "COMMENT" && item.type !== "REPLY" && item.type !== "FOLLOW" && (
                         <Bell className="w-2.5 h-2.5 text-amber-500" />
                       )}
                     </span>

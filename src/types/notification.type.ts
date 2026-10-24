@@ -1,6 +1,7 @@
 export type NotificationType =
   | "LIKE"
   | "COMMENT"
+  | "REPLY"
   | "POST_CREATED"
   | "STORY_CREATED"
   | "FOLLOW"
