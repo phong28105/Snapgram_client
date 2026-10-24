@@ -9,6 +9,7 @@ import { useChat } from "@/hooks/use-chat"
 import { chatService } from "@/services/chat.service"
 import { VerifiedBadge } from "@/components/ui/verified-badge"
 import { getErrorMessage } from "@/lib/api"
+import { formatClock } from "@/lib/time"
 import type { ChatConversation, ChatMessage } from "@/types/chat.type"
 
 interface ChatThreadProps {
@@ -19,6 +20,37 @@ interface ChatThreadProps {
 }
 
 const NEAR_BOTTOM_PX = 140
+
+/**
+ * Thêm/cập nhật một tin nhắn mà không tạo bản trùng.
+ *
+ * Vì sao cần: khi mình gửi tin, tin được thêm optimistic (id tạm) rồi server trả về
+ * bản thật, ĐỒNG THỜI WebSocket cũng broadcast chính tin đó cho mình. Nếu event WS
+ * tới trước khi REST kịp trả, id thật chưa có trong danh sách → phải nhận ra bubble
+ * đang "sending" cùng người gửi + nội dung để thay thế, tránh 2 bubble trùng id.
+ */
+function upsertMessage(list: ChatMessage[], incoming: ChatMessage): ChatMessage[] {
+  const byId = list.findIndex((m) => m.id === incoming.id)
+  if (byId >= 0) {
+    const next = [...list]
+    next[byId] = { ...incoming, status: "sent" }
+    return next
+  }
+
+  const pendingIndex = list.findIndex(
+    (m) =>
+      m.status === "sending" &&
+      m.senderId === incoming.senderId &&
+      m.content === incoming.content
+  )
+  if (pendingIndex >= 0) {
+    const next = [...list]
+    next[pendingIndex] = { ...incoming, status: "sent" }
+    return next
+  }
+
+  return [...list, { ...incoming, status: "sent" }]
+}
 
 export function ChatThread({ conversationId, onBack, backAlwaysVisible = false }: ChatThreadProps) {
   const { user } = useAuth()
@@ -103,16 +135,7 @@ export function ChatThread({ conversationId, onBack, backAlwaysVisible = false }
 
     if (envelope.type === "MESSAGE_CREATED" && data.message) {
       const incoming = data.message
-      setMessages((prev) => {
-        // Tin của chính mình đã được thêm optimistic → thay thế thay vì nhân đôi
-        const existingIndex = prev.findIndex((m) => m.id === incoming.id)
-        if (existingIndex >= 0) {
-          const next = [...prev]
-          next[existingIndex] = { ...incoming, status: "sent" }
-          return next
-        }
-        return [...prev, { ...incoming, status: "sent" }]
-      })
+      setMessages((prev) => upsertMessage(prev, incoming))
 
       // Đang mở hội thoại → coi như đã đọc
       if (incoming.senderId !== user?.id) {
@@ -211,9 +234,17 @@ export function ChatThread({ conversationId, onBack, backAlwaysVisible = false }
         content: text,
         type: "TEXT",
       })
-      setMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...saved, status: "sent" } : m))
-      )
+      setMessages((prev) => {
+        // Bỏ bubble tạm; nếu WS đã thêm bản thật thì chỉ cập nhật, không thêm lần nữa
+        const withoutTemp = prev.filter((m) => m.id !== tempId)
+        const alreadyThere = withoutTemp.findIndex((m) => m.id === saved.id)
+        if (alreadyThere >= 0) {
+          const next = [...withoutTemp]
+          next[alreadyThere] = { ...saved, status: "sent" }
+          return next
+        }
+        return [...withoutTemp, { ...saved, status: "sent" }]
+      })
       setConversation((prev) =>
         prev ? { ...prev, lastMessage: saved, updatedAt: saved.createdAt } : prev
       )
@@ -355,7 +386,7 @@ export function ChatThread({ conversationId, onBack, backAlwaysVisible = false }
                       ? "Đang gửi…"
                       : message.status === "failed"
                         ? "Gửi lỗi"
-                        : formatTime(message.createdAt)}
+                        : formatClock(message.createdAt)}
                     {isSeen && " · Đã xem"}
                   </span>
                 </div>
@@ -412,13 +443,7 @@ export function ChatThread({ conversationId, onBack, backAlwaysVisible = false }
 }
 
 function formatTime(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return ""
-  return new Intl.DateTimeFormat("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Asia/Ho_Chi_Minh",
-  }).format(date)
+  return formatClock(iso)
 }
 
 export default ChatThread

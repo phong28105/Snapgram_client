@@ -8,6 +8,7 @@ import { useChat } from "@/hooks/use-chat"
 import { chatService } from "@/services/chat.service"
 import { userService } from "@/services/user.service"
 import { VerifiedBadge } from "@/components/ui/verified-badge"
+import { formatRelativeTime } from "@/lib/time"
 import type { ChatConversation } from "@/types/chat.type"
 import type { UserProfileResponse } from "@/types/user.type"
 
@@ -280,7 +281,7 @@ export function ConversationList({ activeId, onSelect }: ConversationListProps) 
                         size={12}
                       />
                       <span className="ml-auto text-[9px] text-muted-foreground shrink-0">
-                        {conversation.updatedAt ? formatRelative(conversation.updatedAt) : ""}
+                        {conversation.updatedAt ? formatRelativeTime(conversation.updatedAt) : ""}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -308,20 +309,6 @@ export function ConversationList({ activeId, onSelect }: ConversationListProps) 
       )}
     </div>
   )
-}
-
-function formatRelative(iso: string): string {
-  const then = new Date(iso).getTime()
-  if (Number.isNaN(then)) return ""
-  const diffSec = Math.max(0, Math.floor((Date.now() - then) / 1000))
-  if (diffSec < 60) return "vừa xong"
-  const min = Math.floor(diffSec / 60)
-  if (min < 60) return `${min} phút`
-  const hour = Math.floor(min / 60)
-  if (hour < 24) return `${hour} giờ`
-  const day = Math.floor(hour / 24)
-  if (day < 7) return `${day} ngày`
-  return new Date(iso).toLocaleDateString("vi-VN")
 }
 
 export default ConversationList
