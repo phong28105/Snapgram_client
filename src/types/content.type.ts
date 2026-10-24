@@ -86,6 +86,8 @@ export interface PostResponse {
   hashtags?: string[];
   mentionedUserIds?: string[];
   likedByMe?: boolean;
+  /** Tôi đã lưu bài này chưa (chỉ có khi đã đăng nhập). */
+  savedByMe?: boolean;
   recommendationReason?: string;
 }
 

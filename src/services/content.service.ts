@@ -392,6 +392,19 @@ export const contentService = {
     await apiClient.delete(`/api/follows/${encodeURIComponent(userId)}`);
   },
 
+  /**
+   * Trạng thái follow của tôi với một user
+   * GET /api/follows/status/{targetUserId}
+   */
+  async getFollowStatus(
+    targetUserId: string
+  ): Promise<{ following: boolean; status?: string | null }> {
+    const response = await apiClient.get<{ following: boolean; status?: string | null }>(
+      `/api/follows/status/${encodeURIComponent(targetUserId)}`
+    );
+    return response.data;
+  },
+
   // ==========================================
   // 6. SAVED POSTS & COLLECTIONS API
   // ==========================================

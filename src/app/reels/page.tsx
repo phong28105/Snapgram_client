@@ -27,6 +27,7 @@ import type { PostResponse } from "@/types/content.type"
 
 interface ReelItem {
   id: string
+  authorId?: string
   author: {
     username: string
     avatar: string
@@ -37,6 +38,8 @@ interface ReelItem {
   videoUrl: string
   initialLikes: number
   commentsCount: number
+  likedByMe: boolean
+  savedByMe: boolean
   isReal?: boolean
 }
 
@@ -60,6 +63,7 @@ function mapPostToReelItem(
 
   return {
     id: p.id,
+    authorId: p.authorId,
     author: {
       username,
       avatar,
@@ -70,6 +74,8 @@ function mapPostToReelItem(
     videoUrl: mediaUrl,
     initialLikes: p.likeCount ?? 0,
     commentsCount: p.commentCount ?? 0,
+    likedByMe: Boolean(p.likedByMe),
+    savedByMe: Boolean(p.savedByMe),
     isReal: true,
   }
 }
@@ -84,6 +90,8 @@ export default function ReelsPage() {
   const [isLikedMap, setIsLikedMap] = useState<Record<string, boolean>>({})
   const [likesCountMap, setLikesCountMap] = useState<Record<string, number>>({})
   const [isBookmarkedMap, setIsBookmarkedMap] = useState<Record<string, boolean>>({})
+  const [followMap, setFollowMap] = useState<Record<string, boolean>>({})
+  const [pendingFollow, setPendingFollow] = useState<Record<string, boolean>>({})
   const [isMuted, setIsMuted] = useState(true)
   const [isPlaying, setIsPlaying] = useState(true)
 
@@ -99,6 +107,35 @@ export default function ReelsPage() {
           mapPostToReelItem(p, user?.id, user?.username, user?.avatarUrl)
         )
         setReels(mapped)
+
+        // Khởi tạo state từ dữ liệu server (trước đây luôn reset về false)
+        setIsLikedMap(
+          Object.fromEntries(mapped.map((r) => [r.id, r.likedByMe]))
+        )
+        setLikesCountMap(
+          Object.fromEntries(mapped.map((r) => [r.id, r.initialLikes]))
+        )
+        setIsBookmarkedMap(
+          Object.fromEntries(mapped.map((r) => [r.id, r.savedByMe]))
+        )
+
+        // Nạp trạng thái follow cho từng tác giả (chỉ khi đã đăng nhập)
+        const authorIds = Array.from(
+          new Set(mapped.map((r) => r.authorId).filter(Boolean))
+        ) as string[]
+        if (isAuthenticated && authorIds.length > 0) {
+          const entries = await Promise.all(
+            authorIds.map(async (authorId) => {
+              try {
+                const st = await contentService.getFollowStatus(authorId)
+                return [authorId, Boolean(st.following)] as const
+              } catch {
+                return [authorId, false] as const
+              }
+            })
+          )
+          setFollowMap(Object.fromEntries(entries))
+        }
       } else {
         setReels([])
       }
@@ -107,7 +144,7 @@ export default function ReelsPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [user?.id, user?.username, user?.avatarUrl])
+  }, [user?.id, user?.username, user?.avatarUrl, isAuthenticated])
 
   useEffect(() => {
     loadReelsFromApi()
@@ -152,16 +189,46 @@ export default function ReelsPage() {
       [reelId]: nextLiked ? currentLikes + 1 : Math.max(0, currentLikes - 1),
     }))
 
-    if (currentReel?.isReal) {
-      try {
-        if (nextLiked) {
-          await contentService.interactPost(reelId, { type: "LIKE" })
-        } else {
-          await contentService.unlikePost(reelId)
-        }
-      } catch {
-        // Keep optimistic
+    try {
+      if (nextLiked) {
+        await contentService.interactPost(reelId, { type: "LIKE" })
+      } else {
+        await contentService.unlikePost(reelId)
       }
+    } catch {
+      // Revert khi API lỗi để UI không lệch server
+      setIsLikedMap((prev) => ({ ...prev, [reelId]: currentLiked }))
+      setLikesCountMap((prev) => ({ ...prev, [reelId]: currentLikes }))
+      toast.error("Không thể cập nhật lượt thích.")
+    }
+  }
+
+  const handleToggleFollow = async (authorId?: string) => {
+    if (!authorId) return
+    if (!isAuthenticated) {
+      openLoginModal()
+      return
+    }
+    if (pendingFollow[authorId]) return
+
+    const wasFollowing = followMap[authorId] || false
+    const next = !wasFollowing
+    setFollowMap((prev) => ({ ...prev, [authorId]: next }))
+    setPendingFollow((prev) => ({ ...prev, [authorId]: true }))
+
+    try {
+      if (next) {
+        await contentService.followUser(authorId)
+      } else {
+        await contentService.unfollowUser(authorId)
+      }
+    } catch {
+      setFollowMap((prev) => ({ ...prev, [authorId]: wasFollowing }))
+      toast.error(
+        next ? "Không thể theo dõi người dùng này." : "Không thể bỏ theo dõi."
+      )
+    } finally {
+      setPendingFollow((prev) => ({ ...prev, [authorId]: false }))
     }
   }
 
@@ -174,30 +241,36 @@ export default function ReelsPage() {
     const nextSaved = !currentBookmarked
     setIsBookmarkedMap((prev) => ({ ...prev, [reelId]: nextSaved }))
 
-    if (currentReel?.isReal) {
-      try {
-        if (nextSaved) {
-          await contentService.savePost(reelId)
-          await contentService.interactPost(reelId, { type: "SAVE" }).catch(() => {})
-          toast.success("Đã lưu vào danh mục của bạn!")
-        } else {
-          await contentService.unsavePost(reelId)
-          toast.success("Đã bỏ lưu Reel.")
-        }
-      } catch {
-        // Keep optimistic
+    try {
+      if (nextSaved) {
+        await contentService.savePost(reelId)
+        contentService.interactPost(reelId, { type: "SAVE" }).catch(() => {})
+        toast.success("Đã lưu vào danh mục của bạn!")
+      } else {
+        await contentService.unsavePost(reelId)
+        toast.success("Đã bỏ lưu Reel.")
       }
-    } else {
-      toast.success(nextSaved ? "Đã lưu vào danh mục của bạn!" : "Đã bỏ lưu Reel.")
+    } catch {
+      setIsBookmarkedMap((prev) => ({ ...prev, [reelId]: currentBookmarked }))
+      toast.error("Không thể cập nhật trạng thái lưu.")
     }
   }
 
-  const handleShareReel = (reelId: string) => {
-    const url = typeof window !== "undefined" ? `${window.location.origin}/reel/${reelId}` : ""
-    if (currentReel?.isReal && isAuthenticated) {
+  const handleShareReel = async (reelId: string) => {
+    const url =
+      typeof window !== "undefined" ? `${window.location.origin}/reel/${reelId}` : ""
+    if (isAuthenticated) {
       contentService.interactPost(reelId, { type: "SHARE" }).catch(() => {})
     }
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ title: "Snapgram Reel", url })
+        return
+      } catch {
+        // Người dùng huỷ chia sẻ -> fallback copy
+      }
+    }
+    if (typeof navigator !== "undefined" && navigator.clipboard && url) {
       navigator.clipboard.writeText(url).catch(() => {})
       toast.success("Đã sao chép liên kết Reel!")
     }
@@ -214,6 +287,28 @@ export default function ReelsPage() {
       setCurrentIndex((prev) => prev - 1)
     }
   }
+
+  // Điều hướng bằng bàn phím (↑/↓ hoặc j/k)
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      if (target && /^(INPUT|TEXTAREA)$/.test(target.tagName)) return
+      if ((e.key === "ArrowDown" || e.key === "j") && currentIndex < reels.length - 1) {
+        e.preventDefault()
+        setCurrentIndex((prev) => prev + 1)
+      } else if ((e.key === "ArrowUp" || e.key === "k") && currentIndex > 0) {
+        e.preventDefault()
+        setCurrentIndex((prev) => prev - 1)
+      } else if (e.key === "m") {
+        setIsMuted((m) => !m)
+      } else if (e.key === " ") {
+        e.preventDefault()
+        setIsPlaying((p) => !p)
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [currentIndex, reels.length])
 
   if (isLoading) {
     return (
@@ -258,6 +353,13 @@ export default function ReelsPage() {
   const isLiked = isLikedMap[currentReel.id] || false
   const likesCount = likesCountMap[currentReel.id] ?? currentReel.initialLikes
   const isBookmarked = isBookmarkedMap[currentReel.id] || false
+  const isOwnReel = Boolean(user?.id && currentReel.authorId === user.id)
+  const isFollowingAuthor = Boolean(
+    currentReel.authorId && followMap[currentReel.authorId]
+  )
+  const isFollowPending = Boolean(
+    currentReel.authorId && pendingFollow[currentReel.authorId]
+  )
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -324,15 +426,18 @@ export default function ReelsPage() {
                   >
                     {currentReel.author.username}
                   </Link>
-                  {user?.username?.toLowerCase() !== currentReel.author.username?.toLowerCase() && (
+                  {!isOwnReel && (
                     <button
                       type="button"
-                      onClick={() => {
-                        if (!isAuthenticated) openLoginModal()
-                      }}
-                      className="text-xs font-semibold px-3 py-1 rounded-md border border-white/40 hover:bg-white/20 transition backdrop-blur-sm"
+                      onClick={() => handleToggleFollow(currentReel.authorId)}
+                      disabled={isFollowPending}
+                      className={`text-xs font-semibold px-3 py-1 rounded-md border transition backdrop-blur-sm disabled:opacity-60 ${
+                        isFollowingAuthor
+                          ? "border-white/40 bg-white/15 text-white hover:bg-white/25"
+                          : "border-white/40 text-white hover:bg-white/20"
+                      }`}
                     >
-                      Theo dõi
+                      {isFollowingAuthor ? "Đang theo dõi" : "Theo dõi"}
                     </button>
                   )}
                 </div>

@@ -34,9 +34,10 @@ export default function ReelPage({
 
   const [postData, setPostData] = useState<PostResponse | null>(null)
   const [isLiked, setIsLiked] = useState(false)
-  const [likesCount, setLikesCount] = useState(1420)
+  const [likesCount, setLikesCount] = useState(0)
   const [isBookmarked, setIsBookmarked] = useState(false)
   const [isFollowing, setIsFollowing] = useState(false)
+  const [isFollowPending, setIsFollowPending] = useState(false)
   const [isMuted, setIsMuted] = useState(true)
   const [isPlaying, setIsPlaying] = useState(true)
   const videoRef = useRef<HTMLVideoElement | null>(null)
@@ -50,11 +51,20 @@ export default function ReelPage({
       setPostData(p)
       setIsLiked(Boolean(p.likedByMe))
       setLikesCount(p.likeCount ?? 0)
+      setIsBookmarked(Boolean(p.savedByMe))
 
       if (isAuthenticated) {
         contentService
           .interactPost(reelId, { type: "VIEW", watchTimeRatio: 0.9 })
           .catch(() => {})
+
+        // Nạp trạng thái follow thật thay vì mặc định false
+        if (p.authorId) {
+          contentService
+            .getFollowStatus(p.authorId)
+            .then((st) => setIsFollowing(Boolean(st.following)))
+            .catch(() => {})
+        }
       }
     } catch {
       // Fallback
@@ -75,6 +85,8 @@ export default function ReelPage({
 
   const handleToggleLike = () => {
     requireAuth(async () => {
+      const prevLiked = isLiked
+      const prevCount = likesCount
       const next = !isLiked
       setIsLiked(next)
       setLikesCount((prev) => (next ? prev + 1 : Math.max(0, prev - 1)))
@@ -87,14 +99,42 @@ export default function ReelPage({
             await contentService.unlikePost(reelId)
           }
         } catch {
-          // Optimistic
+          setIsLiked(prevLiked)
+          setLikesCount(prevCount)
+          toast.error("Không thể cập nhật lượt thích.")
         }
+      }
+    })
+  }
+
+  const handleToggleFollow = () => {
+    requireAuth(async () => {
+      const authorId = postData?.authorId
+      if (!authorId || isFollowPending) return
+      const wasFollowing = isFollowing
+      const next = !wasFollowing
+      setIsFollowing(next)
+      setIsFollowPending(true)
+      try {
+        if (next) {
+          await contentService.followUser(authorId)
+        } else {
+          await contentService.unfollowUser(authorId)
+        }
+      } catch {
+        setIsFollowing(wasFollowing)
+        toast.error(
+          next ? "Không thể theo dõi người dùng này." : "Không thể bỏ theo dõi."
+        )
+      } finally {
+        setIsFollowPending(false)
       }
     })
   }
 
   const handleToggleBookmark = () => {
     requireAuth(async () => {
+      const prev = isBookmarked
       const next = !isBookmarked
       setIsBookmarked(next)
       if (isRealUuid) {
@@ -107,7 +147,8 @@ export default function ReelPage({
             toast.success("Đã bỏ lưu Reel.")
           }
         } catch {
-          // Optimistic
+          setIsBookmarked(prev)
+          toast.error("Không thể cập nhật trạng thái lưu.")
         }
       } else {
         toast.success(next ? "Đã lưu vào danh mục của bạn!" : "Đã bỏ lưu Reel.")
@@ -115,12 +156,20 @@ export default function ReelPage({
     })
   }
 
-  const handleShare = () => {
+  const handleShare = async () => {
     const url = typeof window !== "undefined" ? window.location.href : ""
     if (isRealUuid && isAuthenticated) {
       contentService.interactPost(reelId, { type: "SHARE" }).catch(() => {})
     }
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ title: "Snapgram Reel", url })
+        return
+      } catch {
+        // huỷ -> fallback copy
+      }
+    }
+    if (typeof navigator !== "undefined" && navigator.clipboard && url) {
       navigator.clipboard.writeText(url).catch(() => {})
       toast.success("Đã sao chép liên kết Reel!")
     }
@@ -242,8 +291,13 @@ export default function ReelPage({
                 {user?.username?.toLowerCase() !== authorName.toLowerCase() && (
                   <button
                     type="button"
-                    onClick={() => requireAuth(() => setIsFollowing((p) => !p))}
-                    className="text-xs font-semibold px-2.5 py-1 rounded-md border border-white/40 hover:bg-white/20 transition backdrop-blur-sm"
+                    onClick={handleToggleFollow}
+                    disabled={isFollowPending}
+                    className={`text-xs font-semibold px-2.5 py-1 rounded-md border transition backdrop-blur-sm disabled:opacity-60 ${
+                      isFollowing
+                        ? "border-white/40 bg-white/15 text-white hover:bg-white/25"
+                        : "border-white/40 text-white hover:bg-white/20"
+                    }`}
                   >
                     {isFollowing ? "Đang theo dõi" : "Theo dõi"}
                   </button>
@@ -278,7 +332,7 @@ export default function ReelPage({
               >
                 <MessageCircle className="w-7 h-7 -rotate-90" />
               </Link>
-              <span className="text-[11px] font-semibold">{postData?.commentCount ?? 382}</span>
+              <span className="text-[11px] font-semibold">{(postData?.commentCount ?? 0).toLocaleString("vi-VN")}</span>
             </div>
 
             <button
