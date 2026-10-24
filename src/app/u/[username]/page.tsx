@@ -80,6 +80,7 @@ export default function PublicUserProfilePage({
   const [followStatus, setFollowStatus] = useState<"NONE" | "FOLLOWING" | "PENDING">("NONE")
   const [isFollowSubmitting, setIsFollowSubmitting] = useState(false)
   const [isBlocked, setIsBlocked] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [isBlocking, setIsBlocking] = useState(false)
   const [isAvatarOpen, setIsAvatarOpen] = useState(false)
   const [isReportOpen, setIsReportOpen] = useState(false)
@@ -97,6 +98,7 @@ export default function PublicUserProfilePage({
 
   const loadUser = useCallback(async () => {
     setIsLoading(true)
+    setLoadError(null)
     try {
       const data = await userService.getPublicProfile(usernameParam)
       if (!data || !data.id) {
@@ -176,7 +178,6 @@ export default function PublicUserProfilePage({
               const blocked = (res.content || []).some((b) => b.userId === data.id)
               if (blocked) {
                 setIsBlocked(true)
-                setIsNotFound(true)
               }
             })
             .catch(() => {})
@@ -192,8 +193,17 @@ export default function PublicUserProfilePage({
           .then((res) => setFollowingCount(res.totalElements ?? res.content?.length ?? 0))
           .catch(() => {})
       }
-    } catch {
-      setIsNotFound(true)
+    } catch (err) {
+      // Chỉ 404 mới là "không tìm thấy". Lỗi token/network không được giả làm 404
+      // vì người dùng sẽ tưởng tài khoản không tồn tại.
+      const status = (err as { response?: { status?: number } })?.response?.status
+      if (status === 404) {
+        setIsNotFound(true)
+      } else {
+        setLoadError(
+          getErrorMessage(err, "Không tải được hồ sơ. Vui lòng thử lại.")
+        )
+      }
     } finally {
       setIsLoading(false)
     }
@@ -353,12 +363,49 @@ export default function PublicUserProfilePage({
     return <ProfileSkeleton />
   }
 
+  if (loadError) {
+    return (
+      <div className="min-h-screen flex bg-background">
+        <Sidebar />
+        <div className="flex-1 flex flex-col min-w-0">
+          <Navbar />
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+            <p className="text-sm font-semibold">Không tải được hồ sơ</p>
+            <p className="text-xs text-muted-foreground max-w-[320px]">{loadError}</p>
+            <Button size="sm" variant="outline" onClick={() => void loadUser()}>
+              Thử lại
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen flex bg-background">
       <Sidebar />
 
       <div className="flex-1 flex flex-col min-w-0 max-w-5xl mx-auto pb-12">
         <Navbar />
+
+        {/* Bạn đã chặn tài khoản này — hiện băng báo thay vì 404 */}
+        {isBlocked && (
+          <div className="mx-4 md:mx-12 mt-4 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <p className="text-xs text-foreground/90">
+              Bạn đã chặn <span className="font-semibold">@{profile?.username || usernameParam}</span>.
+              Họ không thể xem hồ sơ, theo dõi hay nhắn tin cho bạn.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleToggleBlock}
+              disabled={isBlocking}
+              className="shrink-0"
+            >
+              {isBlocking ? "Đang xử lý…" : "Bỏ chặn"}
+            </Button>
+          </div>
+        )}
 
         <div className="px-4 md:px-12 pt-6 md:pt-10 max-w-4xl w-full mx-auto space-y-8">
           {/* Profile Header */}
