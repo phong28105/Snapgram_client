@@ -1,8 +1,8 @@
 import type { LucideProps } from "lucide-react";
 import {
   BadgePlus,
+  Bell,
   Film,
-  Heart,
   House,
   MessageCircle,
   Search,
@@ -46,7 +46,7 @@ export const sidebarLists: TSidebarList[] = [
   {
     title: "Thông báo",
     active: false,
-    icon: Heart,
+    icon: Bell,
   },
   {
     title: "Tạo",

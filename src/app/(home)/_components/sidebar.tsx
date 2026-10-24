@@ -60,19 +60,9 @@ const Sidebar = () => {
                 return (
                   <NotificationsSheet key={listIndex}>
                     <li className="flex items-center xl:my-1 xl:gap-3 xl:p-3 rounded-lg hover:bg-accent cursor-pointer transition max-xl:p-2 max-xl:justify-center group relative">
-                      <div className="relative">
-                        <DisplayIcon list={itemWithAvatar} />
-                        {unreadCount > 0 && (
-                          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-background" />
-                        )}
-                      </div>
-                      <span className="max-xl:hidden text-base font-light flex items-center justify-between flex-1">
+                      <DisplayIcon list={itemWithAvatar} notificationCount={unreadCount} />
+                      <span className="max-xl:hidden text-base font-light">
                         {list.title}
-                        {unreadCount > 0 && (
-                          <span className="bg-rose-500 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
-                            {unreadCount > 99 ? "99+" : unreadCount}
-                          </span>
-                        )}
                       </span>
                     </li>
                   </NotificationsSheet>
