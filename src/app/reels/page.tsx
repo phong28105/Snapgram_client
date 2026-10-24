@@ -22,6 +22,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { useLoginModal } from "@/components/providers/login-modal-provider"
 import { contentService } from "@/services/content.service"
 import { CommentPanel } from "@/components/content/comment-panel"
+import { VerifiedBadge } from "@/components/ui/verified-badge"
 import { safePoster } from "@/lib/media"
 import { toast } from "sonner"
 import type { PostResponse } from "@/types/content.type"
@@ -29,8 +30,11 @@ import type { PostResponse } from "@/types/content.type"
 /** Số reel tải mỗi lần (lazy load) */
 const REELS_PAGE_SIZE = 6
 
-interface ReelItem {  id: string
+interface ReelItem {
+  id: string
   authorId?: string
+  authorVerified?: boolean
+  authorVerifiedUntil?: string
   author: {
     username: string
     avatar: string
@@ -67,6 +71,8 @@ function mapPostToReelItem(
   return {
     id: p.id,
     authorId: p.authorId,
+    authorVerified: Boolean(p.authorVerified),
+    authorVerifiedUntil: p.authorVerifiedUntil,
     author: {
       username,
       avatar,
@@ -551,6 +557,11 @@ export default function ReelsPage() {
                   >
                     {currentReel.author.username}
                   </Link>
+                  <VerifiedBadge
+                    verified={currentReel.authorVerified}
+                    verifiedUntil={currentReel.authorVerifiedUntil}
+                    size={13}
+                  />
                   {!isOwnReel && (
                     <button
                       type="button"

@@ -68,6 +68,9 @@ export interface PostResponse {
   authorUsername?: string;
   authorDisplayName?: string;
   authorAvatarUrl?: string;
+  /** Tác giả có Blue Tick còn hiệu lực. */
+  authorVerified?: boolean;
+  authorVerifiedUntil?: string;
   contentType?: PostContentType;
   caption?: string;
   mediaId?: string;
@@ -133,6 +136,9 @@ export interface CommentResponse {
   authorUsername?: string;
   authorDisplayName?: string;
   authorAvatarUrl?: string;
+  /** Tác giả bình luận có Blue Tick còn hiệu lực. */
+  authorVerified?: boolean;
+  authorVerifiedUntil?: string;
   content: string;
   parentCommentId?: string;
   likeCount?: number;

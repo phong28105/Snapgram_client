@@ -19,6 +19,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { useLoginModal } from "@/components/providers/login-modal-provider"
 import { contentService } from "@/services/content.service"
 import { CommentPanel } from "@/components/content/comment-panel"
+import { VerifiedBadge } from "@/components/ui/verified-badge"
 import { safePoster } from "@/lib/media"
 import { toast } from "sonner"
 import type { PostResponse } from "@/types/content.type"
@@ -280,6 +281,19 @@ export default function ReelModal({
               >
                 {authorName}
               </Link>
+              <VerifiedBadge
+                verified={
+                  postData?.authorId && user?.id === postData.authorId
+                    ? user.verified
+                    : postData?.authorVerified
+                }
+                verifiedUntil={
+                  postData?.authorId && user?.id === postData.authorId
+                    ? user.verifiedUntil
+                    : postData?.authorVerifiedUntil
+                }
+                size={11}
+              />
               {user?.username?.toLowerCase() !== authorName.toLowerCase() && (
                 <button
                   type="button"

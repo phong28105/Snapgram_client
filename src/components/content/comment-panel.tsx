@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { useLoginModal } from "@/components/providers/login-modal-provider"
 import { contentService } from "@/services/content.service"
 import { AuthorBadge } from "@/components/content/author-badge"
+import { VerifiedBadge } from "@/components/ui/verified-badge"
 import { getErrorMessage } from "@/lib/api"
 import type { CommentResponse } from "@/types/content.type"
 
@@ -22,6 +23,8 @@ interface CommentItem {
   likedByMe: boolean
   parentCommentId?: string
   replyCount?: number
+  authorVerified?: boolean
+  authorVerifiedUntil?: string
 }
 
 function mapComment(
@@ -45,6 +48,8 @@ function mapComment(
     likedByMe: Boolean(c.likedByMe),
     parentCommentId: c.parentCommentId,
     replyCount: c.replyCount,
+    authorVerified: Boolean(c.authorVerified),
+    authorVerifiedUntil: c.authorVerifiedUntil,
   }
 }
 
@@ -297,6 +302,12 @@ export function CommentPanel({
               >
                 {comment.username}
               </Link>
+              <VerifiedBadge
+                verified={comment.authorVerified}
+                verifiedUntil={comment.authorVerifiedUntil}
+                size={isReply ? 10 : 11}
+                className="mr-1.5"
+              />
               {isByPostAuthor && <AuthorBadge className="mr-1.5" />}
               <span className="text-foreground/90">{comment.text}</span>
             </p>

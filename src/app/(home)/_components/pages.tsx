@@ -43,6 +43,7 @@ import { toast } from "sonner"
 import type { CollectionResponse, ContentVisibility, PostResponse } from "@/types/content.type"
 import { PostMediaCarousel } from "@/components/content/post-media-carousel"
 import { AuthorBadge } from "@/components/content/author-badge"
+import { VerifiedBadge } from "@/components/ui/verified-badge"
 
 interface CommentItem {
   id: string
@@ -55,6 +56,8 @@ interface CommentItem {
 interface PostProps {
   id: string
   authorId?: string
+  authorVerified?: boolean
+  authorVerifiedUntil?: string
   author: {
     username: string
     displayName?: string
@@ -100,6 +103,8 @@ function mapPostResponseToCard(
   return {
     id: p.id,
     authorId: p.authorId,
+    authorVerified: Boolean(p.authorVerified),
+    authorVerifiedUntil: p.authorVerifiedUntil,
     author: {
       username,
       displayName,
@@ -352,6 +357,11 @@ function PostCard({
             >
               {post.author.username}
             </Link>
+            <VerifiedBadge
+              verified={post.authorVerified}
+              verifiedUntil={post.authorVerifiedUntil}
+              size={13}
+            />
             <span className="text-muted-foreground">•</span>
             <TimeAgo date={post.createdAt} className="text-muted-foreground" />
             {post.recommendationReason && (
@@ -497,6 +507,12 @@ function PostCard({
         >
           {post.author.username}
         </Link>
+        <VerifiedBadge
+          verified={post.authorVerified}
+          verifiedUntil={post.authorVerifiedUntil}
+          size={12}
+          className="mr-1.5"
+        />
         <span className="text-foreground/90">{post.caption}</span>
       </div>
 

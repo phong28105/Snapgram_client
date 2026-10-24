@@ -32,6 +32,7 @@ import { EditPostDialog } from "@/components/content/edit-post-dialog"
 import { ReportDialog } from "@/components/content/report-dialog"
 import { PostMediaCarousel } from "@/components/content/post-media-carousel"
 import { AuthorBadge } from "@/components/content/author-badge"
+import { VerifiedBadge } from "@/components/ui/verified-badge"
 import { toast } from "sonner"
 import type { CommentResponse, PostResponse, ReportTargetType } from "@/types/content.type"
 
@@ -47,6 +48,8 @@ interface CommentItem {
   parentCommentId?: string
   /** Số trả lời do backend trả về — dùng để quyết định có hiện nút "Xem trả lời". */
   replyCount?: number
+  authorVerified?: boolean
+  authorVerifiedUntil?: string
   isReal?: boolean
 }
 
@@ -72,6 +75,8 @@ function mapCommentDto(
     likedByMe: Boolean(c.likedByMe),
     parentCommentId: c.parentCommentId,
     replyCount: c.replyCount,
+    authorVerified: Boolean(c.authorVerified),
+    authorVerifiedUntil: c.authorVerifiedUntil,
     isReal: true,
   }
 }
@@ -359,6 +364,14 @@ export default function PostPage({
     postData?.authorId && user?.id === postData.authorId && user.avatarUrl
       ? user.avatarUrl
       : postData?.authorAvatarUrl || "/profile.jpg"
+  const authorVerified =
+    postData?.authorId && user?.id === postData.authorId
+      ? Boolean(user.verified)
+      : Boolean(postData?.authorVerified)
+  const authorVerifiedUntil =
+    postData?.authorId && user?.id === postData.authorId
+      ? user.verifiedUntil
+      : postData?.authorVerifiedUntil
   const postMediaUrl =
     postData?.mediaItems?.[0]?.mediaUrl || postData?.mediaUrl || "/profile.jpg"
   const postCaption =
@@ -457,6 +470,12 @@ export default function PostPage({
                   >
                     {authorUsername}
                   </Link>
+                  <VerifiedBadge
+                    verified={authorVerified}
+                    verifiedUntil={authorVerifiedUntil}
+                    size={13}
+                    className="ml-1"
+                  />
                   {!isOwner && (
                     <>
                       <span className="text-muted-foreground mx-1.5">•</span>
@@ -527,6 +546,12 @@ export default function PostPage({
                 <div className="space-y-1">
                   <p className="leading-relaxed">
                     <span className="font-semibold mr-1.5">{authorUsername}</span>
+                    <VerifiedBadge
+                      verified={authorVerified}
+                      verifiedUntil={authorVerifiedUntil}
+                      size={12}
+                      className="mr-1.5"
+                    />
                     <span className="text-foreground/90">{postCaption}</span>
                   </p>
                   <TimeAgo
@@ -578,6 +603,12 @@ export default function PostPage({
                             >
                               {comment.username}
                             </Link>
+                            <VerifiedBadge
+                              verified={comment.authorVerified}
+                              verifiedUntil={comment.authorVerifiedUntil}
+                              size={12}
+                              className="mr-1.5"
+                            />
                             {isCommentByPostAuthor && (
                               <AuthorBadge className="mr-1.5" />
                             )}
@@ -686,6 +717,12 @@ export default function PostPage({
                                     >
                                       {reply.username}
                                     </Link>
+                                    <VerifiedBadge
+                                      verified={reply.authorVerified}
+                                      verifiedUntil={reply.authorVerifiedUntil}
+                                      size={11}
+                                      className="mr-1.5"
+                                    />
                                     {isReplyByPostAuthor && (
                                       <AuthorBadge className="mr-1.5" />
                                     )}
