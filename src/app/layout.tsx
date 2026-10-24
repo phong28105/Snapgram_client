@@ -5,6 +5,7 @@ import { ThemeProvider } from "../components/ui/theme-provider";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { LoginModalProvider } from "@/components/providers/login-modal-provider";
 import { NotificationsProvider } from "@/components/providers/notifications-provider";
+import { ChatProvider } from "@/components/providers/chat-provider";
 import { DesktopMiniChat } from "@/components/chat/desktop-mini-chat";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -32,14 +33,16 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            <NotificationsProvider>
-              <LoginModalProvider>
-                {modal}
-                {children}
-                <DesktopMiniChat />
-                <Toaster />
-              </LoginModalProvider>
-            </NotificationsProvider>
+            <ChatProvider>
+              <NotificationsProvider>
+                <LoginModalProvider>
+                  {modal}
+                  {children}
+                  <DesktopMiniChat />
+                  <Toaster />
+                </LoginModalProvider>
+              </NotificationsProvider>
+            </ChatProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

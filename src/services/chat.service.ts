@@ -2,32 +2,25 @@ import { apiClient } from "@/lib/api"
 import type {
   ChatConversation,
   ChatMessage,
-  SendMessagePayload,
   CreateDirectConversationPayload,
+  MessagePage,
+  SendMessagePayload,
 } from "@/types/chat.type"
 
-export interface PageChatMessage {
-  content?: ChatMessage[]
-  totalElements?: number
-  totalPages?: number
-  number?: number
-  size?: number
-}
-
 export const chatService = {
-  /**
-   * Lấy danh sách cuộc hội thoại của tôi
-   * GET /api/conv
-   */
+  /** GET /api/conv — danh sách hội thoại (đã kèm partner + unreadCount) */
   async getMyConversations(): Promise<ChatConversation[]> {
     const response = await apiClient.get<ChatConversation[]>("/api/conv")
     return response.data
   },
 
-  /**
-   * Tạo hoặc lấy cuộc hội thoại 1-1 với một người dùng
-   * POST /api/conv
-   */
+  /** GET /api/conv/unread-count — tổng tin chưa đọc cho badge */
+  async getUnreadCount(): Promise<number> {
+    const response = await apiClient.get<{ total: number }>("/api/conv/unread-count")
+    return response.data?.total ?? 0
+  },
+
+  /** POST /api/conv — tạo hoặc lấy hội thoại 1-1 */
   async getOrCreateDirectConversation(
     data: CreateDirectConversationPayload
   ): Promise<ChatConversation> {
@@ -35,28 +28,31 @@ export const chatService = {
     return response.data
   },
 
-  /**
-   * Lấy tin nhắn trong cuộc hội thoại
-   * GET /api/conv/{id}/messages
-   */
-  async getMessages(
-    conversationId: string,
-    page = 0,
-    size = 30
-  ): Promise<PageChatMessage> {
-    const response = await apiClient.get<PageChatMessage>(
-      `/api/conv/${conversationId}/messages`,
-      {
-        params: { page, size },
-      }
+  /** GET /api/conv/{id} */
+  async getConversation(conversationId: string): Promise<ChatConversation> {
+    const response = await apiClient.get<ChatConversation>(
+      `/api/conv/${conversationId}`
     )
     return response.data
   },
 
   /**
-   * Gửi tin nhắn mới
-   * POST /api/conv/{id}/messages
+   * GET /api/conv/{id}/messages — trả về cũ → mới
+   * `before` là id tin cũ nhất đã có, dùng để tải thêm tin cũ hơn.
    */
+  async getMessages(
+    conversationId: string,
+    options: { before?: string; page?: number; size?: number } = {}
+  ): Promise<MessagePage> {
+    const { before, page = 0, size = 30 } = options
+    const response = await apiClient.get<MessagePage>(
+      `/api/conv/${conversationId}/messages`,
+      { params: { page, size, ...(before ? { before } : {}) } }
+    )
+    return response.data
+  },
+
+  /** POST /api/conv/{id}/messages */
   async sendMessage(
     conversationId: string,
     data: SendMessagePayload
@@ -66,5 +62,35 @@ export const chatService = {
       data
     )
     return response.data
+  },
+
+  /** DELETE /api/conv/{id}/messages/{messageId} */
+  async deleteMessage(conversationId: string, messageId: string): Promise<void> {
+    await apiClient.delete(
+      `/api/conv/${conversationId}/messages/${messageId}`
+    )
+  },
+
+  /** POST /api/conv/{id}/read */
+  async markRead(
+    conversationId: string,
+    lastReadMessageId?: string
+  ): Promise<ChatConversation> {
+    const response = await apiClient.post<ChatConversation>(
+      `/api/conv/${conversationId}/read`,
+      lastReadMessageId ? { lastReadMessageId } : {}
+    )
+    return response.data
+  },
+
+  /** POST /api/conv/{id}/typing — dự phòng khi WebSocket không khả dụng */
+  async typing(
+    conversationId: string,
+    payload: { typing?: boolean; username?: string } = {}
+  ): Promise<void> {
+    await apiClient.post(`/api/conv/${conversationId}/typing`, {
+      typing: payload.typing ?? true,
+      username: payload.username,
+    })
   },
 }

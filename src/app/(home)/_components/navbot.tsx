@@ -6,11 +6,12 @@ import CreatePost from "@/components/ui/create-post"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
-import { toast } from "sonner"
+import { useChat } from "@/hooks/use-chat"
 
 const Navbot = () => {
   const pathname = usePathname()
   const { user } = useAuth()
+  const { unreadTotal: chatUnread } = useChat()
 
   return (
     <nav className="block md:hidden sticky bottom-0 z-20">
@@ -42,13 +43,11 @@ const Navbot = () => {
 
             if (sidebarList.title === "Tin nhắn") {
               return (
-                <li
-                  key={sidebarListIndex}
-                  onClick={() => toast.info("Tính năng Tin nhắn sẽ sớm ra mắt khi có API!")}
-                  className="cursor-pointer"
-                >
-                  <DisplayIcon list={itemWithAvatar} />
-                </li>
+                <Link key={sidebarListIndex} href="/messages">
+                  <li className="cursor-pointer">
+                    <DisplayIcon list={itemWithAvatar} messageCount={chatUnread} />
+                  </li>
+                </Link>
               )
             }
 

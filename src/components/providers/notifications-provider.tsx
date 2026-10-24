@@ -235,10 +235,18 @@ export function NotificationsProvider({
 
         setUnreadCount((prev) => prev + 1)
 
-        const message = extractNotificationMessage(data)
-        toast.info(message, {
-          description: "Xem trong mục Thông báo",
-        })
+        // Tin nhắn đã có UI chat realtime riêng (ChatProvider) → chỉ tăng badge,
+        // không bắn toast để tránh thông báo trùng.
+        const notificationType =
+          data && typeof data === "object"
+            ? (data as Record<string, unknown>).type
+            : null
+        if (notificationType !== "MESSAGE") {
+          const message = extractNotificationMessage(data)
+          toast.info(message, {
+            description: "Xem trong mục Thông báo",
+          })
+        }
 
         try {
           window.dispatchEvent(

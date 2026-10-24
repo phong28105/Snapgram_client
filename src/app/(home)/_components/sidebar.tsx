@@ -12,12 +12,13 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
 import { useNotifications } from "@/hooks/use-notifications"
-import { toast } from "sonner"
+import { useChat } from "@/hooks/use-chat"
 
 const Sidebar = () => {
   const pathname = usePathname()
   const { user } = useAuth()
   const { unreadCount } = useNotifications()
+  const { unreadTotal: chatUnread } = useChat()
 
   return (
     <aside className="sticky top-0 w-[72px] xl:w-[244px] 2xl:w-[335px] max-md:hidden border-r border-border h-screen pb-5 pt-2 px-3">
@@ -71,14 +72,12 @@ const Sidebar = () => {
 
               if (list.title === "Tin nhắn") {
                 return (
-                  <li
-                    key={listIndex}
-                    onClick={() => toast.info("Tính năng Tin nhắn sẽ sớm ra mắt khi có API!")}
-                    className="flex items-center xl:my-1 xl:gap-3 xl:p-3 rounded-lg hover:bg-accent cursor-pointer transition max-xl:p-2 max-xl:justify-center group"
-                  >
-                    <DisplayIcon list={itemWithAvatar} />
-                    <span className="max-xl:hidden text-base font-light">{list.title}</span>
-                  </li>
+                  <Link key={listIndex} href="/messages">
+                    <li className="flex items-center xl:my-1 xl:gap-3 xl:p-3 rounded-lg hover:bg-accent cursor-pointer transition max-xl:p-2 max-xl:justify-center group">
+                      <DisplayIcon list={itemWithAvatar} messageCount={chatUnread} />
+                      <span className="max-xl:hidden text-base font-light">{list.title}</span>
+                    </li>
+                  </Link>
                 )
               }
 

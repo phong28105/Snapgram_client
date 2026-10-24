@@ -41,6 +41,7 @@ export const sidebarLists: TSidebarList[] = [
   {
     title: "Tin nhắn",
     active: false,
+    href: "/messages",
     icon: MessageCircle,
   },
   {
