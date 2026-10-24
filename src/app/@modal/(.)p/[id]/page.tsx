@@ -44,6 +44,8 @@ interface CommentItem {
   likeCount: number
   likedByMe: boolean
   parentCommentId?: string
+  /** Số trả lời do backend trả về — dùng để quyết định có hiện nút "Xem trả lời". */
+  replyCount?: number
   isReal?: boolean
 }
 
@@ -68,6 +70,7 @@ function mapCommentDto(
     likeCount: c.likeCount ?? 0,
     likedByMe: Boolean(c.likedByMe),
     parentCommentId: c.parentCommentId,
+    replyCount: c.replyCount,
     isReal: true,
   }
 }
@@ -580,13 +583,17 @@ export default function PostModal({
                             >
                               Trả lời
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => handleLoadReplies(comment.id)}
-                              className="font-semibold hover:text-foreground transition"
-                            >
-                              {isExpanded ? "Ẩn trả lời" : "Xem trả lời"}
-                            </button>
+                            {(isExpanded || replies.length > 0 || (comment.replyCount ?? 0) > 0) && (
+                              <button
+                                type="button"
+                                onClick={() => handleLoadReplies(comment.id)}
+                                className="font-semibold hover:text-foreground transition"
+                              >
+                                {isExpanded
+                                  ? "Ẩn trả lời"
+                                  : `Xem trả lời${(comment.replyCount ?? replies.length) > 0 ? ` (${comment.replyCount ?? replies.length})` : ""}`}
+                              </button>
+                            )}
                             {canDeleteComment ? (
                               <button
                                 type="button"

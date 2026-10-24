@@ -135,6 +135,8 @@ export interface CommentResponse {
   parentCommentId?: string;
   likeCount?: number;
   likedByMe?: boolean;
+  /** Số trả lời trực tiếp — chỉ backend trả về cho comment gốc. */
+  replyCount?: number;
   createdAt?: string;
   updatedAt?: string;
 }
