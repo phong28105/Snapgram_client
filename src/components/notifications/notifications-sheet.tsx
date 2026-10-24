@@ -79,7 +79,11 @@ export function NotificationsSheet({ children }: NotificationsSheetProps) {
         contentService.getPendingFollowRequests(0, 20).catch(() => ({ content: [] })),
       ])
 
-      const notifs = notifRes.content || []
+      const notifs = (notifRes.content || []).map((n) => ({
+        ...n,
+        // Backend có thể trả key `read` thay vì `isRead`
+        isRead: n.isRead ?? n.read ?? false,
+      }))
       const pending = followReqRes.content || []
 
       setNotifications(notifs)

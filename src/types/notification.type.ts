@@ -19,6 +19,8 @@ export interface NotificationResponse {
   targetId?: string
   payload?: string | Record<string, any>
   isRead: boolean
+  /** Backend có thể serialize boolean getter `isRead()` thành key `read` — chấp nhận cả hai. */
+  read?: boolean
   createdAt: string
   actorUsername?: string
   actorDisplayName?: string
