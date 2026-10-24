@@ -7,10 +7,12 @@ import { toast } from "sonner"
 import { useAuth } from "@/hooks/use-auth"
 import { useLoginModal } from "@/components/providers/login-modal-provider"
 import { contentService } from "@/services/content.service"
+import { mediaService } from "@/services/media.service"
+import { MediaPicker, type PickedMedia } from "@/components/ui/media-picker"
 import { AuthorBadge } from "@/components/content/author-badge"
 import { VerifiedBadge } from "@/components/ui/verified-badge"
 import { getErrorMessage } from "@/lib/api"
-import type { CommentResponse } from "@/types/content.type"
+import type { CommentMediaType, CommentResponse } from "@/types/content.type"
 
 interface CommentItem {
   id: string
@@ -18,6 +20,8 @@ interface CommentItem {
   username: string
   avatar: string
   text: string
+  mediaUrl?: string
+  mediaType?: CommentMediaType
   createdAt: string
   likeCount: number
   likedByMe: boolean
@@ -42,7 +46,9 @@ function mapComment(
       : c.authorUsername || c.authorId || "snapgram_user",
     avatar:
       isMe && currentAvatar ? currentAvatar : c.authorAvatarUrl || "/profile.jpg",
-    text: c.content,
+    text: c.content || "",
+    mediaUrl: c.mediaUrl,
+    mediaType: c.mediaType,
     createdAt: c.createdAt || new Date().toISOString(),
     likeCount: c.likeCount ?? 0,
     likedByMe: Boolean(c.likedByMe),
@@ -86,6 +92,7 @@ export function CommentPanel({
   const [replyingTo, setReplyingTo] = useState<{ id: string; username: string } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const [input, setInput] = useState("")
   const inputRef = useRef<HTMLInputElement | null>(null)
   const listRef = useRef<HTMLDivElement | null>(null)
@@ -164,13 +171,25 @@ export function CommentPanel({
     }
     const content = input.trim()
     if (!content || isSubmitting) return
+    await submitComment({ content })
+  }
+
+  /** Gửi bình luận (text hoặc kèm media) — dùng chung cho form và MediaPicker. */
+  const submitComment = async (payload: {
+    content: string
+    mediaUrl?: string
+    mediaType?: CommentMediaType
+  }) => {
+    if (isSubmitting) return
 
     const parentCommentId = replyingTo?.id
     setIsSubmitting(true)
     try {
       const created = await contentService.createComment(postId, {
-        content,
+        content: payload.content,
         parentCommentId,
+        mediaUrl: payload.mediaUrl,
+        mediaType: payload.mediaType,
       })
       const mapped = mapComment(created, user?.id, user?.username, user?.avatarUrl)
 
@@ -204,6 +223,35 @@ export function CommentPanel({
       toast.error(getErrorMessage(err, "Không thể gửi bình luận."))
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  /** Ảnh / sticker / GIF cho bình luận. */
+  const handlePickMedia = async (picked: PickedMedia) => {
+    if (!isAuthenticated) {
+      openLoginModal()
+      return
+    }
+    if (isSubmitting || isUploading) return
+
+    if (picked.kind === "STICKER") {
+      await submitComment({ content: picked.emoji, mediaType: "STICKER" })
+      return
+    }
+    if (picked.kind === "GIF") {
+      await submitComment({ content: "", mediaUrl: picked.url, mediaType: "GIF" })
+      return
+    }
+
+    setIsUploading(true)
+    try {
+      const uploaded = await mediaService.upload(picked.file)
+      if (!uploaded?.url) throw new Error("Không nhận được URL ảnh")
+      await submitComment({ content: "", mediaUrl: uploaded.url, mediaType: "IMAGE" })
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Không tải được ảnh lên."))
+    } finally {
+      setIsUploading(false)
     }
   }
 
@@ -309,8 +357,35 @@ export function CommentPanel({
                 className="mr-1.5"
               />
               {isByPostAuthor && <AuthorBadge className="mr-1.5" />}
-              <span className="text-foreground/90">{comment.text}</span>
+              {comment.mediaType !== "STICKER" && (
+                <span className="text-foreground/90">{comment.text}</span>
+              )}
             </p>
+
+            {/* Sticker: emoji cỡ lớn */}
+            {comment.mediaType === "STICKER" && comment.text && (
+              <span className="inline-block text-4xl leading-none mt-0.5 select-none">
+                {comment.text}
+              </span>
+            )}
+
+            {/* Ảnh / GIF đính kèm */}
+            {(comment.mediaType === "IMAGE" || comment.mediaType === "GIF") &&
+              comment.mediaUrl && (
+                <a
+                  href={comment.mediaUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block mt-1 w-fit"
+                >
+                  <img
+                    src={comment.mediaUrl}
+                    alt="media"
+                    loading="lazy"
+                    className="max-w-[180px] max-h-[220px] rounded-lg border border-border object-cover"
+                  />
+                </a>
+              )}
             <div className="flex items-center gap-3 text-[10px] text-muted-foreground mt-0.5">
               <span>{formatRelative(comment.createdAt)}</span>
               {comment.likeCount > 0 && (
@@ -446,7 +521,7 @@ export function CommentPanel({
           </div>
         )}
         <div className="flex items-center gap-2">
-          <Smile className="w-4 h-4 text-muted-foreground shrink-0" />
+          <MediaPicker onPick={handlePickMedia} disabled={isSubmitting || isUploading} />
           <input
             ref={inputRef}
             value={input}

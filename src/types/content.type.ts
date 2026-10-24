@@ -127,7 +127,13 @@ export interface InteractionRequest {
 export interface CreateCommentRequest {
   content: string;
   parentCommentId?: string;
+  /** URL ảnh/GIF đã upload, hoặc emoji nếu là sticker. */
+  mediaUrl?: string;
+  /** IMAGE | GIF | STICKER */
+  mediaType?: CommentMediaType;
 }
+
+export type CommentMediaType = "IMAGE" | "GIF" | "STICKER";
 
 export interface CommentResponse {
   id: string;
@@ -141,6 +147,8 @@ export interface CommentResponse {
   authorVerifiedUntil?: string;
   content: string;
   parentCommentId?: string;
+  mediaUrl?: string;
+  mediaType?: CommentMediaType;
   likeCount?: number;
   likedByMe?: boolean;
   /** Số trả lời trực tiếp — chỉ backend trả về cho comment gốc. */

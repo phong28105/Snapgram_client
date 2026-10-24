@@ -177,7 +177,9 @@ export default function PublicUserProfilePage({
             .then((res) => {
               const blocked = (res.content || []).some((b) => b.userId === data.id)
               if (blocked) {
+                // Chủ tài khoản đã chặn người này → ẩn hồ sơ hoàn toàn (404)
                 setIsBlocked(true)
+                setIsNotFound(true)
               }
             })
             .catch(() => {})

@@ -31,8 +31,10 @@ import { getErrorMessage } from "@/lib/api"
 import { ReportDialog } from "@/components/content/report-dialog"
 import { PostMediaCarousel } from "@/components/content/post-media-carousel"
 import { AuthorBadge } from "@/components/content/author-badge"
+import { MediaPicker, type PickedMedia } from "@/components/ui/media-picker"
+import { mediaService } from "@/services/media.service"
 import { toast } from "sonner"
-import type { CommentResponse, PostResponse, ReportTargetType } from "@/types/content.type"
+import type { CommentMediaType, CommentResponse, PostResponse, ReportTargetType } from "@/types/content.type"
 
 interface CommentItem {
   id: string
@@ -46,6 +48,8 @@ interface CommentItem {
   parentCommentId?: string
   /** Số trả lời do backend trả về — dùng để quyết định có hiện nút "Xem trả lời". */
   replyCount?: number
+  mediaUrl?: string
+  mediaType?: CommentMediaType
   isReal?: boolean
 }
 
@@ -65,12 +69,14 @@ function mapCommentDto(
     avatar: isMe && currentAvatar
       ? currentAvatar
       : c.authorAvatarUrl || "/profile.jpg",
-    text: c.content,
+    text: c.content || "",
     createdAt: c.createdAt || new Date().toISOString(),
     likeCount: c.likeCount ?? 0,
     likedByMe: Boolean(c.likedByMe),
     parentCommentId: c.parentCommentId,
     replyCount: c.replyCount,
+    mediaUrl: c.mediaUrl,
+    mediaType: c.mediaType,
     isReal: true,
   }
 }
@@ -292,8 +298,18 @@ export default function PostModal({
     }
 
     const content = commentInput.trim()
-    const parentCommentId = replyingTo?.id
     setCommentInput("")
+    await submitComment({ content })
+  }
+
+  /** Gửi bình luận (text hoặc kèm media). */
+  const submitComment = async (payload: {
+    content: string
+    mediaUrl?: string
+    mediaType?: CommentMediaType
+  }) => {
+    const content = payload.content
+    const parentCommentId = replyingTo?.id
     setReplyingTo(null)
 
     if (isRealUuid) {
@@ -301,6 +317,8 @@ export default function PostModal({
         const created = await contentService.createComment(postId, {
           content,
           parentCommentId,
+          mediaUrl: payload.mediaUrl,
+          mediaType: payload.mediaType,
         })
         const mapped = mapCommentDto(
           created,
@@ -329,6 +347,8 @@ export default function PostModal({
       username: user?.username || "me",
       avatar: user?.avatarUrl || "/profile.jpg",
       text: content,
+      mediaUrl: payload.mediaUrl,
+      mediaType: payload.mediaType,
       createdAt: new Date().toISOString(),
       likeCount: 0,
       likedByMe: false,
@@ -342,6 +362,33 @@ export default function PostModal({
       }))
     } else {
       setComments((prev) => [...prev, fallbackNew])
+    }
+  }
+
+  /** Ảnh / sticker / GIF cho bình luận. */
+  const handlePickCommentMedia = async (picked: PickedMedia) => {
+    if (!isAuthenticated) {
+      openLoginModal()
+      return
+    }
+    if (picked.kind === "STICKER") {
+      await submitComment({ content: picked.emoji, mediaType: "STICKER" })
+      return
+    }
+    if (picked.kind === "GIF") {
+      await submitComment({ content: "", mediaUrl: picked.url, mediaType: "GIF" })
+      return
+    }
+    try {
+      const uploaded = await mediaService.upload(picked.file)
+      if (!uploaded?.url) throw new Error("Không nhận được URL ảnh")
+      await submitComment({
+        content: "",
+        mediaUrl: uploaded.url,
+        mediaType: "IMAGE",
+      })
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Không tải được ảnh lên."))
     }
   }
 
@@ -567,8 +614,32 @@ export default function PostModal({
                             {isCommentByPostAuthor && (
                               <AuthorBadge className="mr-1.5" />
                             )}
-                            <span className="text-foreground/90">{comment.text}</span>
+                            {comment.mediaType !== "STICKER" && (
+                              <span className="text-foreground/90">{comment.text}</span>
+                            )}
                           </p>
+                          {comment.mediaType === "STICKER" && comment.text && (
+                            <span className="inline-block text-4xl leading-none mt-0.5 select-none">
+                              {comment.text}
+                            </span>
+                          )}
+                          {(comment.mediaType === "IMAGE" ||
+                            comment.mediaType === "GIF") &&
+                            comment.mediaUrl && (
+                              <a
+                                href={comment.mediaUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="block mt-1 w-fit"
+                              >
+                                <img
+                                  src={comment.mediaUrl}
+                                  alt="media"
+                                  loading="lazy"
+                                  className="max-w-[170px] max-h-[210px] rounded-lg border border-border object-cover"
+                                />
+                              </a>
+                            )}
                           <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                             <TimeAgo date={comment.createdAt} />
                             {comment.likeCount > 0 && (
@@ -673,10 +744,34 @@ export default function PostModal({
                                     {isReplyByPostAuthor && (
                                       <AuthorBadge className="mr-1.5" />
                                     )}
-                                    <span className="text-foreground/90">
+                                    {reply.mediaType !== "STICKER" && (
+                                      <span className="text-foreground/90">
+                                        {reply.text}
+                                      </span>
+                                    )}
+                                  </p>
+                                  {reply.mediaType === "STICKER" && reply.text && (
+                                    <span className="inline-block text-3xl leading-none mt-0.5 select-none">
                                       {reply.text}
                                     </span>
-                                  </p>
+                                  )}
+                                  {(reply.mediaType === "IMAGE" ||
+                                    reply.mediaType === "GIF") &&
+                                    reply.mediaUrl && (
+                                      <a
+                                        href={reply.mediaUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="block mt-1 w-fit"
+                                      >
+                                        <img
+                                          src={reply.mediaUrl}
+                                          alt="media"
+                                          loading="lazy"
+                                          className="max-w-[150px] max-h-[190px] rounded-lg border border-border object-cover"
+                                        />
+                                      </a>
+                                    )}
                                   <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                                     <TimeAgo date={reply.createdAt} />
                                     {reply.likeCount > 0 && (
@@ -810,10 +905,7 @@ export default function PostModal({
             onSubmit={handleAddComment}
             className="flex items-center gap-2 px-3.5 py-3 border-t border-border/60 shrink-0"
           >
-            <Smile
-              onClick={handleCommentButtonClick}
-              className="w-5 h-5 text-muted-foreground shrink-0 cursor-pointer hover:text-foreground transition"
-            />
+            <MediaPicker onPick={handlePickCommentMedia} />
             <input
               ref={commentInputRef}
               type="text"

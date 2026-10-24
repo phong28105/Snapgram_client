@@ -7,6 +7,8 @@ import { toast } from "sonner"
 import { useAuth } from "@/hooks/use-auth"
 import { useChat } from "@/hooks/use-chat"
 import { chatService } from "@/services/chat.service"
+import { mediaService } from "@/services/media.service"
+import { MediaPicker, type PickedMedia } from "@/components/ui/media-picker"
 import { VerifiedBadge } from "@/components/ui/verified-badge"
 import { getErrorMessage } from "@/lib/api"
 import { formatClock } from "@/lib/time"
@@ -65,6 +67,7 @@ export function ChatThread({ conversationId, onBack, backAlwaysVisible = false }
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined)
   const [input, setInput] = useState("")
   const [isSending, setIsSending] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
 
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
@@ -204,24 +207,27 @@ export function ChatThread({ conversationId, onBack, backAlwaysVisible = false }
     }
   }
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const text = input.trim()
-    if (!text || isSending) return
+  /** Gửi một tin nhắn (text hoặc media) với optimistic update. */
+  const sendPayload = async (payload: {
+    content: string
+    type: string
+    mediaUrl?: string
+  }) => {
+    if (isSending) return
 
     const tempId = `temp-${Date.now()}`
     const optimistic: ChatMessage = {
       id: tempId,
       conversationId,
       senderId: user?.id || "",
-      type: "TEXT",
-      content: text,
+      type: payload.type,
+      content: payload.content,
+      mediaUrl: payload.mediaUrl,
       createdAt: new Date().toISOString(),
       status: "sending",
     }
 
     setMessages((prev) => [...prev, optimistic])
-    setInput("")
     setIsSending(true)
     notifyTyping(false)
 
@@ -230,10 +236,7 @@ export function ChatThread({ conversationId, onBack, backAlwaysVisible = false }
     )
 
     try {
-      const saved = await chatService.sendMessage(conversationId, {
-        content: text,
-        type: "TEXT",
-      })
+      const saved = await chatService.sendMessage(conversationId, payload)
       setMessages((prev) => {
         // Bỏ bubble tạm; nếu WS đã thêm bản thật thì chỉ cập nhật, không thêm lần nữa
         const withoutTemp = prev.filter((m) => m.id !== tempId)
@@ -257,6 +260,43 @@ export function ChatThread({ conversationId, onBack, backAlwaysVisible = false }
       toast.error(getErrorMessage(err, "Không gửi được tin nhắn."))
     } finally {
       setIsSending(false)
+    }
+  }
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const text = input.trim()
+    if (!text || isSending) return
+    setInput("")
+    await sendPayload({ content: text, type: "TEXT" })
+  }
+
+  /** Gửi ảnh / sticker / GIF đã chọn từ MediaPicker. */
+  const handlePickMedia = async (picked: PickedMedia) => {
+    if (isSending || isUploading) return
+
+    if (picked.kind === "STICKER") {
+      await sendPayload({ content: picked.emoji, type: "STICKER" })
+      return
+    }
+
+    if (picked.kind === "GIF") {
+      await sendPayload({ content: "", type: "GIF", mediaUrl: picked.url })
+      return
+    }
+
+    // Ảnh: upload lên media-service trước, rồi gửi URL
+    setIsUploading(true)
+    try {
+      const uploaded = await mediaService.upload(picked.file)
+      if (!uploaded?.url) {
+        throw new Error("Không nhận được URL ảnh")
+      }
+      await sendPayload({ content: "", type: "IMAGE", mediaUrl: uploaded.url })
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Không tải được ảnh lên."))
+    } finally {
+      setIsUploading(false)
     }
   }
 
@@ -371,15 +411,59 @@ export function ChatThread({ conversationId, onBack, backAlwaysVisible = false }
                         <Trash2 className="w-3 h-3" />
                       </button>
                     )}
-                    <div
-                      className={`px-3 py-1.5 rounded-2xl text-xs break-words whitespace-pre-wrap ${
-                        isMe
-                          ? "bg-primary text-primary-foreground rounded-br-sm"
-                          : "bg-muted text-foreground rounded-bl-sm"
-                      } ${message.status === "failed" ? "opacity-60 ring-1 ring-destructive" : ""}`}
-                    >
-                      {message.content}
-                    </div>
+                    {message.type === "STICKER" ? (
+                      /* Sticker: emoji cỡ lớn, không có nền bubble */
+                      <span
+                        className={`text-5xl leading-none select-none ${
+                          message.status === "failed" ? "opacity-60" : ""
+                        }`}
+                      >
+                        {message.content}
+                      </span>
+                    ) : message.mediaUrl &&
+                      (message.type === "IMAGE" || message.type === "GIF") ? (
+                      /* Ảnh / GIF: hiển thị ảnh, kèm chú thích nếu có */
+                      <div className="space-y-1">
+                        <a
+                          href={message.mediaUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block"
+                        >
+                          <img
+                            src={message.mediaUrl}
+                            alt="media"
+                            loading="lazy"
+                            className={`max-w-[230px] max-h-[300px] rounded-xl object-cover border border-border ${
+                              message.status === "failed"
+                                ? "opacity-60 ring-1 ring-destructive"
+                                : ""
+                            }`}
+                          />
+                        </a>
+                        {message.content && (
+                          <div
+                            className={`px-3 py-1.5 rounded-2xl text-xs break-words whitespace-pre-wrap ${
+                              isMe
+                                ? "bg-primary text-primary-foreground rounded-br-sm"
+                                : "bg-muted text-foreground rounded-bl-sm"
+                            }`}
+                          >
+                            {message.content}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div
+                        className={`px-3 py-1.5 rounded-2xl text-xs break-words whitespace-pre-wrap ${
+                          isMe
+                            ? "bg-primary text-primary-foreground rounded-br-sm"
+                            : "bg-muted text-foreground rounded-bl-sm"
+                        } ${message.status === "failed" ? "opacity-60 ring-1 ring-destructive" : ""}`}
+                      >
+                        {message.content}
+                      </div>
+                    )}
                   </div>
                   <span className="text-[9px] text-muted-foreground px-1 mt-0.5">
                     {message.status === "sending"
@@ -414,6 +498,7 @@ export function ChatThread({ conversationId, onBack, backAlwaysVisible = false }
         onSubmit={handleSend}
         className="p-2.5 border-t border-border flex items-center gap-2 shrink-0"
       >
+        <MediaPicker onPick={handlePickMedia} disabled={isSending || isUploading} />
         <input
           type="text"
           value={input}
@@ -427,11 +512,11 @@ export function ChatThread({ conversationId, onBack, backAlwaysVisible = false }
         />
         <button
           type="submit"
-          disabled={!input.trim() || isSending}
+          disabled={!input.trim() || isSending || isUploading}
           className="p-2 rounded-full bg-primary text-primary-foreground disabled:opacity-40 hover:opacity-90 transition shrink-0"
           aria-label="Gửi"
         >
-          {isSending ? (
+          {isSending || isUploading ? (
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
             <Send className="w-4 h-4" />
@@ -440,10 +525,6 @@ export function ChatThread({ conversationId, onBack, backAlwaysVisible = false }
       </form>
     </div>
   )
-}
-
-function formatTime(iso: string): string {
-  return formatClock(iso)
 }
 
 export default ChatThread

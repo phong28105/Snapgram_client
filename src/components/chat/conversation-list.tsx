@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { useAuth } from "@/hooks/use-auth"
 import { useChat } from "@/hooks/use-chat"
 import { chatService } from "@/services/chat.service"
+import { contentService } from "@/services/content.service"
 import { userService } from "@/services/user.service"
 import { VerifiedBadge } from "@/components/ui/verified-badge"
 import { formatRelativeTime } from "@/lib/time"
@@ -25,8 +26,8 @@ export function ConversationList({ activeId, onSelect }: ConversationListProps) 
   const [isLoading, setIsLoading] = useState(true)
   const [isNewChatOpen, setIsNewChatOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
-  const [searchResults, setSearchResults] = useState<UserProfileResponse[]>([])
-  const [isSearching, setIsSearching] = useState(false)
+  const [following, setFollowing] = useState<UserProfileResponse[]>([])
+  const [isLoadingFollowing, setIsLoadingFollowing] = useState(false)
 
   const loadConversations = useCallback(async () => {
     setIsLoading(true)
@@ -95,26 +96,51 @@ export function ConversationList({ activeId, onSelect }: ConversationListProps) 
     )
   }, [activeId])
 
-  useEffect(() => {
-    if (!isNewChatOpen || !searchQuery.trim()) {
-      setSearchResults([])
-      return
-    }
-
-    const timer = setTimeout(async () => {
-      setIsSearching(true)
-      try {
-        const res = await userService.searchUsers(searchQuery.trim(), 0, 10)
-        setSearchResults((res.content || []).filter((u) => u.id !== user?.id))
-      } catch {
-        setSearchResults([])
-      } finally {
-        setIsSearching(false)
+  // Gợi ý người để nhắn tin: chỉ những người mình ĐÃ FOLLOW.
+  const loadFollowing = useCallback(async () => {
+    if (!user?.id) return
+    setIsLoadingFollowing(true)
+    try {
+      const page = await contentService.getFollowing(0, 100, user.id)
+      const ids = (page.content || [])
+        .filter((f) => !f.status || f.status === "ACCEPTED")
+        .map((f) => f.followingId)
+        .filter((id): id is string => Boolean(id) && id !== user.id)
+      if (ids.length === 0) {
+        setFollowing([])
+        return
       }
-    }, 300)
+      const profiles = await userService.getUsersBatch(ids)
+      setFollowing(profiles.filter((u) => u.id !== user.id))
+    } catch {
+      setFollowing([])
+    } finally {
+      setIsLoadingFollowing(false)
+    }
+  }, [user?.id])
 
-    return () => clearTimeout(timer)
-  }, [isNewChatOpen, searchQuery, user?.id])
+  // Mở panel "Tin nhắn mới" → nạp danh sách đã follow
+  useEffect(() => {
+    if (isNewChatOpen) void loadFollowing()
+  }, [isNewChatOpen, loadFollowing])
+
+  const filteredSuggestions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    // Ẩn người đã có hội thoại để gợi ý đúng người còn chưa nhắn
+    const existingPartners = new Set(
+      conversations
+        .map((c) => c.partner?.id)
+        .filter((id): id is string => Boolean(id))
+    )
+    return following.filter((u) => {
+      if (existingPartners.has(u.id)) return false
+      if (!q) return true
+      return (
+        u.username?.toLowerCase().includes(q) ||
+        u.displayName?.toLowerCase().includes(q)
+      )
+    })
+  }, [following, searchQuery, conversations])
 
   const handleStartChat = async (target: UserProfileResponse) => {
     try {
@@ -186,19 +212,19 @@ export function ConversationList({ activeId, onSelect }: ConversationListProps) 
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm tài khoản để nhắn tin…"
+              placeholder="Tìm trong những người bạn đã theo dõi…"
               className="w-full bg-muted/60 pl-8 pr-3 py-2 rounded-lg text-xs outline-none focus:ring-1 focus:ring-primary border border-transparent focus:border-primary/40"
               autoFocus
             />
           </div>
 
           <div className="flex-1 overflow-y-auto space-y-1">
-            {isSearching ? (
+            {isLoadingFollowing ? (
               <div className="py-6 flex justify-center">
                 <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
               </div>
-            ) : searchResults.length > 0 ? (
-              searchResults.map((result) => (
+            ) : filteredSuggestions.length > 0 ? (
+              filteredSuggestions.map((result) => (
                 <button
                   key={result.id}
                   type="button"
@@ -227,11 +253,19 @@ export function ConversationList({ activeId, onSelect }: ConversationListProps) 
               ))
             ) : searchQuery.trim() ? (
               <p className="py-6 text-center text-xs text-muted-foreground">
-                Không tìm thấy người dùng
+                Không có ai trong danh sách theo dõi khớp “{searchQuery.trim()}”
               </p>
+            ) : following.length === 0 ? (
+              <div className="py-8 text-center space-y-1 px-4">
+                <p className="text-xs font-medium">Bạn chưa theo dõi ai</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Hãy theo dõi ai đó trước — danh sách gợi ý nhắn tin chỉ gồm
+                  những người bạn đã theo dõi.
+                </p>
+              </div>
             ) : (
               <p className="py-6 text-center text-xs text-muted-foreground">
-                Nhập tên người dùng để bắt đầu trò chuyện
+                Bạn đã nhắn tin với tất cả người mình theo dõi.
               </p>
             )}
           </div>
