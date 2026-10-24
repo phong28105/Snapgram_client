@@ -45,6 +45,15 @@ export const userService = {
     return res.data
   },
 
+  /** POST /api/users/batch — Lấy thông tin tóm tắt hàng loạt người dùng theo danh sách ID */
+  async getUsersBatch(userIds: string[]): Promise<UserProfileResponse[]> {
+    if (!userIds || userIds.length === 0) return []
+    const res = await apiClient.post<UserProfileResponse[]>("/api/users/batch", {
+      userIds,
+    })
+    return res.data
+  },
+
   /** POST /api/users/me/heartbeat — Cập nhật trạng thái đang hoạt động */
   async heartbeat(): Promise<void> {
     await apiClient.post("/api/users/me/heartbeat")

@@ -1,12 +1,16 @@
 "use client";
 
-import { Heart, Search } from "lucide-react";
+import { Bell, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React from "react";
+import { NotificationsSheet } from "@/components/notifications/notifications-sheet";
+import { NotificationBadge } from "@/components/notifications/notification-badge";
+import { useNotifications } from "@/hooks/use-notifications";
 
 const Navbar = () => {
   const router = useRouter();
+  const { unreadCount } = useNotifications();
   const [isInputActive, setIsInputActive] = React.useState<boolean>(false);
   const [query, setQuery] = React.useState<string>("");
 
@@ -55,9 +59,17 @@ const Navbar = () => {
             </div>
           </form>
 
-          <button type="button">
-            <Heart className="w-6 h-6" />
-          </button>
+          <NotificationsSheet>
+            <button
+              type="button"
+              aria-label={unreadCount > 0 ? `Thông báo (${unreadCount} chưa đọc)` : "Thông báo"}
+              className="relative inline-flex items-center justify-center p-1 rounded-md hover:bg-accent transition"
+            >
+              <Bell className="w-[22px] h-[22px] sm:w-6 sm:h-6" />
+              <NotificationBadge count={unreadCount} size="sm" className="sm:hidden" />
+              <NotificationBadge count={unreadCount} size="md" className="hidden sm:flex" />
+            </button>
+          </NotificationsSheet>
         </div>
       </div>
     </nav>

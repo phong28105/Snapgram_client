@@ -4,6 +4,8 @@ export interface UserProfileResponse {
   displayName?: string
   avatarUrl?: string
   privateAccount?: boolean
+  verified?: boolean
+  verifiedUntil?: string
   createdAt?: string
   bio?: string
   website?: string

@@ -1,4 +1,5 @@
 import axios, { AxiosError, AxiosRequestConfig, InternalAxiosRequestConfig } from "axios"
+import { toast } from "sonner"
 
 const GATEWAY_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 
@@ -52,6 +53,7 @@ const AUTH_PAGES = ["/login", "/register", "/forgot-password", "/reset-password"
 
 // Nhiều request 401 cùng lúc thì chỉ refresh 1 lần, các request còn lại chờ chung kết quả
 let refreshPromise: Promise<unknown> | null = null
+let lastRateLimitToastTime = 0
 
 apiClient.interceptors.response.use(
   (response) => response,
@@ -60,6 +62,21 @@ apiClient.interceptors.response.use(
       | (InternalAxiosRequestConfig & { _retry?: boolean })
       | undefined
     const url = original?.url ?? ""
+
+    // Xử lý 429 Too Many Requests (Rate Limit Exceeded)
+    if (error.response?.status === 429) {
+      const now = Date.now()
+      // Throttle toast cảnh báo mỗi 5 giây để tránh spam
+      if (now - lastRateLimitToastTime > 5000) {
+        lastRateLimitToastTime = now
+        if (typeof window !== "undefined") {
+          toast.warning("Hệ thống nhận quá nhiều yêu cầu trong thời gian ngắn", {
+            description: "Vui lòng đợi vài giây rồi thử lại để tránh bị giới hạn tốc độ (Rate Limit).",
+          })
+        }
+      }
+      return Promise.reject(error)
+    }
 
     if (
       !original ||
@@ -83,7 +100,8 @@ apiClient.interceptors.response.use(
     } catch (refreshError) {
       // Refresh thất bại: phiên đã hết, đưa về trang login
       if (typeof window !== "undefined" && !AUTH_PAGES.includes(window.location.pathname)) {
-        window.location.href = "/login"
+        const redirectTo = `${window.location.pathname}${window.location.search}`
+        window.location.href = `/login?redirect=${encodeURIComponent(redirectTo)}`
       }
       return Promise.reject(refreshError)
     }

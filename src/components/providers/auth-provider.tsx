@@ -35,8 +35,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const data = await authService.getMe()
       setUser(data)
-    } catch {
-      setUser(null)
+    } catch (err: unknown) {
+      // Chỉ hủy user session khi nhận 401 Unauthorized (token hết hạn/sai)
+      // Nếu là lỗi 429 (Rate Limit) hoặc network timeout thì giữ nguyên state để không kick người dùng ra login
+      const axiosStatus = (err as { response?: { status?: number } })?.response?.status
+      if (axiosStatus === 401) {
+        setUser(null)
+      }
     } finally {
       setIsLoading(false)
       isFetchingRef.current = false
@@ -45,6 +50,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     fetchCurrentUser()
+  }, [fetchCurrentUser])
+
+  // Khi quay lại tab (vd: từ cổng thanh toán) → làm mới hồ sơ để huy hiệu tích xanh
+  // hiện ngay, không phải tải lại trang.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        fetchCurrentUser()
+      }
+    }
+    window.addEventListener("focus", onVisible)
+    document.addEventListener("visibilitychange", onVisible)
+    return () => {
+      window.removeEventListener("focus", onVisible)
+      document.removeEventListener("visibilitychange", onVisible)
+    }
   }, [fetchCurrentUser])
 
   // Gửi heartbeat định kỳ mỗi 2 phút khi đã đăng nhập
@@ -65,7 +86,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (res.user) {
       setUser(res.user)
     }
-    await fetchCurrentUser()
+    try {
+      await fetchCurrentUser()
+    } catch {
+      // Giữ user từ response login nếu getMe gặp độ trễ
+    }
     return res
   }
 
@@ -74,11 +99,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (res.user) {
       setUser(res.user)
     }
-    await fetchCurrentUser()
+    try {
+      await fetchCurrentUser()
+    } catch {
+      // Giữ user từ response login nếu getMe gặp độ trễ
+    }
     return res
   }
 
   const logout = async () => {
+    setUser(null)
     try {
       await authService.logout()
     } finally {

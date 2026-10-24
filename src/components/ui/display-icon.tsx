@@ -1,11 +1,19 @@
 import { TSidebarList } from "@/data";
 import { IoMdHome } from "react-icons/io";
 import { Badge } from "./badge";
+import { NotificationBadge } from "@/components/notifications/notification-badge";
 import Image from "next/image";
 
-const DisplayIcon = ({ list }: { list: TSidebarList }) => (
+const DisplayIcon = ({
+  list,
+  notificationCount = 0,
+}: {
+  list: TSidebarList;
+  /** Số thông báo chưa đọc — hiển thị badge trên icon "Thông báo". */
+  notificationCount?: number;
+}) => (
   <div className="relative">
-    {/* BADGE */}
+    {/* BADGE: Tin nhắn (tĩnh) */}
     {list.title === "Tin nhắn" ? (
       <Badge
         variant="destructive"
@@ -13,6 +21,11 @@ const DisplayIcon = ({ list }: { list: TSidebarList }) => (
       >
         9+
       </Badge>
+    ) : null}
+
+    {/* BADGE: Thông báo (số chưa đọc, góc trên-phải icon) */}
+    {list.title === "Thông báo" ? (
+      <NotificationBadge count={notificationCount} />
     ) : null}
 
     {list.title.toLowerCase() === "trang chủ" ? (
