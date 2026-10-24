@@ -21,6 +21,7 @@ import Navbar from "@/app/(home)/_components/navbar"
 import { useAuth } from "@/hooks/use-auth"
 import { useLoginModal } from "@/components/providers/login-modal-provider"
 import { contentService } from "@/services/content.service"
+import { safePoster } from "@/lib/media"
 import { toast } from "sonner"
 import type { PostResponse } from "@/types/content.type"
 
@@ -54,9 +55,7 @@ function mapPostToReelItem(
     : p.authorAvatarUrl || "/profile.jpg"
   const rawMediaUrl = p.mediaItems?.[0]?.mediaUrl || p.mediaUrl || ""
   const rawThumb = p.mediaItems?.[0]?.thumbnailUrl
-  const hasRealThumb = Boolean(
-    rawThumb && rawThumb !== rawMediaUrl && !/\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(rawThumb)
-  )
+  const poster = safePoster(rawThumb, rawMediaUrl)
   const mediaUrl = rawMediaUrl || "/auth-image-1.webp"
 
   return {
@@ -67,7 +66,7 @@ function mapPostToReelItem(
     },
     caption: p.caption || "Khoảnh khắc thước phim Snapgram 🎬",
     audio: `Âm thanh gốc - ${username}`,
-    videoThumbnail: hasRealThumb ? (rawThumb as string) : "",
+    videoThumbnail: poster ?? "",
     videoUrl: mediaUrl,
     initialLikes: p.likeCount ?? 0,
     commentsCount: p.commentCount ?? 0,

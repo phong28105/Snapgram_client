@@ -45,6 +45,7 @@ import { userService } from "@/services/user.service"
 import { mediaService } from "@/services/media.service"
 import { contentService } from "@/services/content.service"
 import { getErrorMessage } from "@/lib/api"
+import { isVideoMedia, safePoster } from "@/lib/media"
 import type { NoteResponse, UserProfileResponse } from "@/types/user.type"
 import type { MediaResponse } from "@/types/media.type"
 import type { CollectionResponse, PostResponse } from "@/types/content.type"
@@ -259,17 +260,16 @@ export default function ProfilePage() {
 
   const realPostGridItems: PostGridItem[] = myPosts.map((p) => {
     const firstMedia = p.mediaItems?.[0]
-    const isVideo =
-      p.contentType === "REEL" ||
-      p.contentType === "VIDEO" ||
-      firstMedia?.mediaType?.startsWith("video/") ||
-      /\.(mp4|webm|mov)$/i.test(firstMedia?.mediaUrl || p.mediaUrl || "")
-    const thumb = firstMedia?.thumbnailUrl
     const media = firstMedia?.mediaUrl || p.mediaUrl || ""
+    const isVideo =
+      isVideoMedia(media, firstMedia?.mediaType) ||
+      p.contentType === "REEL" ||
+      p.contentType === "VIDEO"
+    const poster = safePoster(firstMedia?.thumbnailUrl, media)
 
     return {
       id: p.id,
-      image: thumb && !/\.(mp4|webm|mov)$/i.test(thumb) ? thumb : !isVideo ? (media || "/profile.jpg") : undefined,
+      image: isVideo ? poster : poster || media || "/profile.jpg",
       videoUrl: isVideo ? media : undefined,
       likes: p.likeCount ?? 0,
       comments: p.commentCount ?? 0,
@@ -280,11 +280,11 @@ export default function ProfilePage() {
   })
 
   const realMediaGridItems: PostGridItem[] = myMedia.map((m) => {
-    const isVideo = m.mimeType?.startsWith("video/") || /\.(mp4|webm|mov)$/i.test(m.url || "")
-    const thumb = m.thumbnailUrl
+    const isVideo = isVideoMedia(m.url, m.mimeType)
+    const poster = safePoster(m.thumbnailUrl, m.url)
     return {
       id: m.id,
-      image: thumb && !/\.(mp4|webm|mov)$/i.test(thumb) ? thumb : !isVideo ? (m.url || "/profile.jpg") : undefined,
+      image: isVideo ? poster : poster || m.url || "/profile.jpg",
       videoUrl: isVideo ? m.url : undefined,
       likes: 0,
       comments: 0,
@@ -303,17 +303,16 @@ export default function ProfilePage() {
 
   const savedGridItems: PostGridItem[] = savedPosts.map((p) => {
     const firstMedia = p.mediaItems?.[0]
-    const isVideo =
-      p.contentType === "REEL" ||
-      p.contentType === "VIDEO" ||
-      firstMedia?.mediaType?.startsWith("video/") ||
-      /\.(mp4|webm|mov)$/i.test(firstMedia?.mediaUrl || p.mediaUrl || "")
-    const thumb = firstMedia?.thumbnailUrl
     const media = firstMedia?.mediaUrl || p.mediaUrl || ""
+    const isVideo =
+      isVideoMedia(media, firstMedia?.mediaType) ||
+      p.contentType === "REEL" ||
+      p.contentType === "VIDEO"
+    const poster = safePoster(firstMedia?.thumbnailUrl, media)
 
     return {
       id: p.id,
-      image: thumb && !/\.(mp4|webm|mov)$/i.test(thumb) ? thumb : !isVideo ? (media || "/profile.jpg") : undefined,
+      image: isVideo ? poster : poster || media || "/profile.jpg",
       videoUrl: isVideo ? media : undefined,
       likes: p.likeCount ?? 0,
       comments: p.commentCount ?? 0,
@@ -658,9 +657,10 @@ export default function ProfilePage() {
                     className="relative aspect-square group bg-muted overflow-hidden select-none"
                   >
                     <Link href={`/p/${post.id}`} scroll={false} className="block w-full h-full">
-                      {post.videoUrl && !post.image ? (
+                      {post.videoUrl ? (
                         <video
                           src={post.videoUrl}
+                          poster={post.image || undefined}
                           preload="metadata"
                           className="w-full h-full object-cover pointer-events-none transition duration-300 group-hover:scale-105"
                           muted

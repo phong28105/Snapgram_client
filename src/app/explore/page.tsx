@@ -21,6 +21,7 @@ import Navbot from "@/app/(home)/_components/navbot"
 import Navbar from "@/app/(home)/_components/navbar"
 import { userService } from "@/services/user.service"
 import { contentService } from "@/services/content.service"
+import { isVideoMedia, safePoster } from "@/lib/media"
 import type { UserProfileResponse } from "@/types/user.type"
 import type { HashtagResponse, PostResponse } from "@/types/content.type"
 
@@ -51,24 +52,20 @@ const RECENT_SEARCH_STORAGE_KEY = "snapgram_recent_searches"
 function mapPostToTile(p: PostResponse, idx: number): ExploreTile {
   const firstMedia = p.mediaItems?.[0]
   const rawMediaUrl = firstMedia?.mediaUrl || p.mediaUrl || ""
-  const isVideoMedia =
-    firstMedia?.mediaType === "VIDEO" ||
+  const isVideoItem =
+    isVideoMedia(rawMediaUrl, firstMedia?.mediaType) ||
     p.contentType === "REEL" ||
-    p.contentType === "VIDEO" ||
-    /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(rawMediaUrl)
+    p.contentType === "VIDEO"
 
-  // thumbnailUrl may wrongly point at the video file itself -> treat as missing
-  const rawThumb = firstMedia?.thumbnailUrl
-  const hasRealThumb = Boolean(
-    rawThumb && rawThumb !== rawMediaUrl && !/\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(rawThumb)
-  )
+  // thumbnailUrl có thể bị gán nhầm thành chính URL file video -> bỏ qua
+  const poster = safePoster(firstMedia?.thumbnailUrl, rawMediaUrl)
 
   const isReel = p.contentType === "REEL"
   const isCarousel = p.contentType === "CAROUSEL" || (Boolean(p.mediaItems) && (p.mediaItems?.length ?? 0) > 1)
   return {
     id: p.id,
-    image: hasRealThumb ? (rawThumb as string) : "",
-    videoUrl: isVideoMedia ? rawMediaUrl : undefined,
+    image: isVideoItem ? poster ?? "" : poster || rawMediaUrl,
+    videoUrl: isVideoItem ? rawMediaUrl : undefined,
     likes: p.likeCount ?? 0,
     comments: p.commentCount ?? 0,
     category: "Dành cho bạn",
