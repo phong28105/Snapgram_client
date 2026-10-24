@@ -18,6 +18,7 @@ import {
 import { useAuth } from "@/hooks/use-auth"
 import { useLoginModal } from "@/components/providers/login-modal-provider"
 import { contentService } from "@/services/content.service"
+import { CommentPanel } from "@/components/content/comment-panel"
 import { safePoster } from "@/lib/media"
 import { toast } from "sonner"
 import type { PostResponse } from "@/types/content.type"
@@ -42,6 +43,8 @@ export default function ReelModal({
   const [isFollowPending, setIsFollowPending] = useState(false)
   const [isPlaying, setIsPlaying] = useState(true)
   const [isMuted, setIsMuted] = useState(true)
+  const [showComments, setShowComments] = useState(false)
+  const [commentsCount, setCommentsCount] = useState(0)
   const videoRef = useRef<HTMLVideoElement | null>(null)
 
   const isRealUuid = !reelId.startsWith("reel-") && !reelId.startsWith("post-")
@@ -54,6 +57,7 @@ export default function ReelModal({
       setIsLiked(Boolean(p.likedByMe))
       setLikesCount(p.likeCount ?? 0)
       setIsBookmarked(Boolean(p.savedByMe))
+      setCommentsCount(p.commentCount ?? 0)
 
       if (isAuthenticated) {
         contentService
@@ -322,15 +326,19 @@ export default function ReelModal({
             </div>
 
             <div className="flex flex-col items-center gap-1">
-              <Link
-                href={`/p/${reelId}`}
-                onClick={() => router.back()}
-                className="p-2.5 rounded-full bg-black/40 hover:bg-black/60 transition"
+              <button
+                type="button"
+                onClick={() => setShowComments((v) => !v)}
+                className={`p-2.5 rounded-full transition ${
+                  showComments ? "bg-white/25" : "bg-black/40 hover:bg-black/60"
+                }`}
+                aria-label="Xem bình luận"
+                aria-expanded={showComments}
               >
                 <MessageCircle className="w-6 h-6 -rotate-90" />
-              </Link>
+              </button>
               <span className="text-[10px] font-semibold">
-                {postData?.commentCount ?? 0}
+                {commentsCount}
               </span>
             </div>
 
@@ -355,6 +363,21 @@ export default function ReelModal({
             </button>
           </div>
         </div>
+
+        {/* Panel bình luận overlay trong dialog */}
+        {showComments && (
+          <div className="absolute inset-0 z-30 bg-background">
+            <CommentPanel
+              key={reelId}
+              postId={reelId}
+              postAuthorId={postData?.authorId}
+              initialCount={commentsCount}
+              onCountChange={setCommentsCount}
+              onClose={() => setShowComments(false)}
+              className="h-full w-full rounded-none border-0"
+            />
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )

@@ -186,6 +186,23 @@ export const contentService = {
   },
 
   /**
+   * Lấy danh sách trả lời của một bình luận
+   * GET /api/posts/{postId}/comments/{commentId}/replies
+   */
+  async getReplies(
+    postId: string,
+    commentId: string,
+    page = 0,
+    size = 20
+  ): Promise<PageCommentResponse> {
+    const response = await apiClient.get<PageCommentResponse>(
+      `/api/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}/replies`,
+      { params: { page, size } }
+    );
+    return response.data;
+  },
+
+  /**
    * Like bình luận
    * POST /api/posts/{postId}/comments/{commentId}/like
    */

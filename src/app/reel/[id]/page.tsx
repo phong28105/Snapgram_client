@@ -17,6 +17,7 @@ import SnapgramLogo from "@/components/logo/SnapgramLogo"
 import { useAuth } from "@/hooks/use-auth"
 import { useLoginModal } from "@/components/providers/login-modal-provider"
 import { contentService } from "@/services/content.service"
+import { CommentPanel } from "@/components/content/comment-panel"
 import { safePoster } from "@/lib/media"
 import { toast } from "sonner"
 import type { PostResponse } from "@/types/content.type"
@@ -40,6 +41,8 @@ export default function ReelPage({
   const [isFollowPending, setIsFollowPending] = useState(false)
   const [isMuted, setIsMuted] = useState(true)
   const [isPlaying, setIsPlaying] = useState(true)
+  const [showComments, setShowComments] = useState(false)
+  const [commentsCount, setCommentsCount] = useState(0)
   const videoRef = useRef<HTMLVideoElement | null>(null)
 
   const isRealUuid = !reelId.startsWith("reel-") && !reelId.startsWith("post-")
@@ -52,6 +55,7 @@ export default function ReelPage({
       setIsLiked(Boolean(p.likedByMe))
       setLikesCount(p.likeCount ?? 0)
       setIsBookmarked(Boolean(p.savedByMe))
+      setCommentsCount(p.commentCount ?? 0)
 
       if (isAuthenticated) {
         contentService
@@ -326,13 +330,20 @@ export default function ReelPage({
             </div>
 
             <div className="flex flex-col items-center gap-1">
-              <Link
-                href={`/p/${reelId}`}
-                className="p-3 rounded-full hover:bg-muted/80 transition"
+              <button
+                type="button"
+                onClick={() => setShowComments((v) => !v)}
+                className={`p-3 rounded-full transition ${
+                  showComments ? "bg-muted" : "hover:bg-muted/80"
+                }`}
+                aria-label="Xem bình luận"
+                aria-expanded={showComments}
               >
                 <MessageCircle className="w-7 h-7 -rotate-90" />
-              </Link>
-              <span className="text-[11px] font-semibold">{(postData?.commentCount ?? 0).toLocaleString("vi-VN")}</span>
+              </button>
+              <span className="text-[11px] font-semibold">
+                {commentsCount.toLocaleString("vi-VN")}
+              </span>
             </div>
 
             <button
@@ -351,6 +362,26 @@ export default function ReelPage({
               <Bookmark className={`w-6 h-6 ${isBookmarked ? "fill-foreground" : ""}`} />
             </button>
           </div>
+
+          {/* Panel bình luận: cột phải trên desktop, bottom sheet trên mobile */}
+          {showComments && (
+            <>
+              <div
+                className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                onClick={() => setShowComments(false)}
+                aria-hidden
+              />
+              <CommentPanel
+                key={reelId}
+                postId={reelId}
+                postAuthorId={postData?.authorId}
+                initialCount={commentsCount}
+                onCountChange={setCommentsCount}
+                onClose={() => setShowComments(false)}
+                className="fixed inset-x-0 bottom-0 z-50 h-[65vh] rounded-t-2xl lg:static lg:inset-auto lg:z-auto lg:h-[620px] sm:lg:h-[680px] lg:w-[340px] lg:rounded-2xl"
+              />
+            </>
+          )}
         </div>
       </main>
     </div>

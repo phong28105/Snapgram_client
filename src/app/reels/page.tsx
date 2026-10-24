@@ -21,6 +21,7 @@ import Navbar from "@/app/(home)/_components/navbar"
 import { useAuth } from "@/hooks/use-auth"
 import { useLoginModal } from "@/components/providers/login-modal-provider"
 import { contentService } from "@/services/content.service"
+import { CommentPanel } from "@/components/content/comment-panel"
 import { safePoster } from "@/lib/media"
 import { toast } from "sonner"
 import type { PostResponse } from "@/types/content.type"
@@ -92,6 +93,8 @@ export default function ReelsPage() {
   const [isBookmarkedMap, setIsBookmarkedMap] = useState<Record<string, boolean>>({})
   const [followMap, setFollowMap] = useState<Record<string, boolean>>({})
   const [pendingFollow, setPendingFollow] = useState<Record<string, boolean>>({})
+  const [commentsCountMap, setCommentsCountMap] = useState<Record<string, number>>({})
+  const [showComments, setShowComments] = useState(false)
   const [isMuted, setIsMuted] = useState(true)
   const [isPlaying, setIsPlaying] = useState(true)
 
@@ -117,6 +120,9 @@ export default function ReelsPage() {
         )
         setIsBookmarkedMap(
           Object.fromEntries(mapped.map((r) => [r.id, r.savedByMe]))
+        )
+        setCommentsCountMap(
+          Object.fromEntries(mapped.map((r) => [r.id, r.commentsCount]))
         )
 
         // Nạp trạng thái follow cho từng tác giả (chỉ khi đã đăng nhập)
@@ -310,6 +316,32 @@ export default function ReelsPage() {
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [currentIndex, reels.length])
 
+  // Đồng bộ lại like/comment/save khi quay lại tab (ví dụ vừa comment ở trang khác)
+  useEffect(() => {
+    const syncCurrentReel = async () => {
+      const reel = reels[currentIndex]
+      if (!reel?.isReal) return
+      try {
+        const p = await contentService.getPost(reel.id)
+        setIsLikedMap((prev) => ({ ...prev, [reel.id]: Boolean(p.likedByMe) }))
+        setLikesCountMap((prev) => ({ ...prev, [reel.id]: p.likeCount ?? 0 }))
+        setIsBookmarkedMap((prev) => ({ ...prev, [reel.id]: Boolean(p.savedByMe) }))
+        setCommentsCountMap((prev) => ({ ...prev, [reel.id]: p.commentCount ?? 0 }))
+      } catch {
+        // bỏ qua, giữ số liệu hiện tại
+      }
+    }
+    const onFocus = () => {
+      if (document.visibilityState === "visible") syncCurrentReel()
+    }
+    window.addEventListener("focus", onFocus)
+    document.addEventListener("visibilitychange", onFocus)
+    return () => {
+      window.removeEventListener("focus", onFocus)
+      document.removeEventListener("visibilitychange", onFocus)
+    }
+  }, [currentIndex, reels])
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex bg-background">
@@ -353,6 +385,8 @@ export default function ReelsPage() {
   const isLiked = isLikedMap[currentReel.id] || false
   const likesCount = likesCountMap[currentReel.id] ?? currentReel.initialLikes
   const isBookmarked = isBookmarkedMap[currentReel.id] || false
+  const commentsCount =
+    commentsCountMap[currentReel.id] ?? currentReel.commentsCount
   const isOwnReel = Boolean(user?.id && currentReel.authorId === user.id)
   const isFollowingAuthor = Boolean(
     currentReel.authorId && followMap[currentReel.authorId]
@@ -477,17 +511,21 @@ export default function ReelsPage() {
               </span>
             </div>
 
-            {/* Comment Button (links to /p/[id]) */}
+            {/* Comment Button (mở panel bình luận ngay trong reel) */}
             <div className="flex flex-col items-center gap-1">
-              <Link
-                href={`/p/${currentReel.id}`}
-                className="p-3 rounded-full hover:bg-muted/80 transition"
+              <button
+                type="button"
+                onClick={() => setShowComments((v) => !v)}
+                className={`p-3 rounded-full transition ${
+                  showComments ? "bg-muted" : "hover:bg-muted/80"
+                }`}
                 aria-label="Xem bình luận"
+                aria-expanded={showComments}
               >
                 <MessageCircle className="w-7 h-7 -rotate-90 text-foreground" />
-              </Link>
+              </button>
               <span className="text-[11px] font-semibold">
-                {currentReel.commentsCount.toLocaleString("vi-VN")}
+                {commentsCount.toLocaleString("vi-VN")}
               </span>
             </div>
 
@@ -537,6 +575,31 @@ export default function ReelsPage() {
               </button>
             </div>
           </div>
+
+          {/* Panel bình luận: cột phải trên desktop, bottom sheet trên mobile */}
+          {showComments && (
+            <>
+              <div
+                className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+                onClick={() => setShowComments(false)}
+                aria-hidden
+              />
+              <CommentPanel
+                key={currentReel.id}
+                postId={currentReel.id}
+                postAuthorId={currentReel.authorId}
+                initialCount={commentsCount}
+                onCountChange={(next) =>
+                  setCommentsCountMap((prev) => ({
+                    ...prev,
+                    [currentReel.id]: next,
+                  }))
+                }
+                onClose={() => setShowComments(false)}
+                className="fixed inset-x-0 bottom-0 z-50 h-[65vh] rounded-t-2xl lg:static lg:inset-auto lg:z-auto lg:h-[640px] sm:lg:h-[720px] lg:w-[340px] lg:rounded-2xl"
+              />
+            </>
+          )}
         </div>
 
         <Navbot />
