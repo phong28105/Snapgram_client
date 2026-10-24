@@ -30,6 +30,7 @@ import { contentService } from "@/services/content.service"
 import { getErrorMessage } from "@/lib/api"
 import { ReportDialog } from "@/components/content/report-dialog"
 import { PostMediaCarousel } from "@/components/content/post-media-carousel"
+import { AuthorBadge } from "@/components/content/author-badge"
 import { toast } from "sonner"
 import type { CommentResponse, PostResponse, ReportTargetType } from "@/types/content.type"
 
@@ -538,6 +539,11 @@ export default function PostModal({
                     ((comment.authorId && comment.authorId === user.id) ||
                       comment.username === user.username)
                 )
+                // Tác giả bài viết được phép xoá mọi bình luận trong bài của mình
+                const isCommentByPostAuthor = Boolean(
+                  comment.authorId && postData?.authorId && comment.authorId === postData.authorId
+                )
+                const canDeleteComment = isCommentOwner || isOwner
                 const replies = repliesMap[comment.id] || []
                 const isExpanded = Boolean(expandedReplies[comment.id])
 
@@ -555,6 +561,9 @@ export default function PostModal({
                             <span className="font-semibold mr-1.5">
                               {comment.username}
                             </span>
+                            {isCommentByPostAuthor && (
+                              <AuthorBadge className="mr-1.5" />
+                            )}
                             <span className="text-foreground/90">{comment.text}</span>
                           </p>
                           <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
@@ -578,11 +587,12 @@ export default function PostModal({
                             >
                               {isExpanded ? "Ẩn trả lời" : "Xem trả lời"}
                             </button>
-                            {isCommentOwner ? (
+                            {canDeleteComment ? (
                               <button
                                 type="button"
                                 onClick={() => handleDeleteComment(comment)}
                                 className="text-destructive opacity-0 group-hover:opacity-100 transition"
+                                title="Xóa bình luận"
                               >
                                 <Trash2 className="w-3 h-3" />
                               </button>
@@ -628,6 +638,10 @@ export default function PostModal({
                               ((reply.authorId && reply.authorId === user.id) ||
                                 reply.username === user.username)
                           )
+                          const isReplyByPostAuthor = Boolean(
+                            reply.authorId && postData?.authorId && reply.authorId === postData.authorId
+                          )
+                          const canDeleteReply = isReplyOwner || isOwner
                           return (
                             <div
                               key={reply.id}
@@ -649,6 +663,9 @@ export default function PostModal({
                                     >
                                       {reply.username}
                                     </Link>
+                                    {isReplyByPostAuthor && (
+                                      <AuthorBadge className="mr-1.5" />
+                                    )}
                                     <span className="text-foreground/90">
                                       {reply.text}
                                     </span>
@@ -665,7 +682,7 @@ export default function PostModal({
                                     >
                                       Trả lời
                                     </button>
-                                    {isReplyOwner && (
+                                    {canDeleteReply && (
                                       <button
                                         type="button"
                                         onClick={() =>

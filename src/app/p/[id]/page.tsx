@@ -31,6 +31,7 @@ import { getErrorMessage } from "@/lib/api"
 import { EditPostDialog } from "@/components/content/edit-post-dialog"
 import { ReportDialog } from "@/components/content/report-dialog"
 import { PostMediaCarousel } from "@/components/content/post-media-carousel"
+import { AuthorBadge } from "@/components/content/author-badge"
 import { toast } from "sonner"
 import type { CommentResponse, PostResponse, ReportTargetType } from "@/types/content.type"
 
@@ -549,6 +550,11 @@ export default function PostPage({
                     ((comment.authorId && comment.authorId === user.id) ||
                       comment.username === user.username)
                 )
+                // Tác giả bài viết được phép xoá mọi bình luận trong bài của mình
+                const isCommentByPostAuthor = Boolean(
+                  comment.authorId && postData?.authorId && comment.authorId === postData.authorId
+                )
+                const canDeleteComment = isCommentOwner || isOwner
                 const replies = repliesMap[comment.id] || []
                 const isExpanded = Boolean(expandedReplies[comment.id])
 
@@ -569,6 +575,9 @@ export default function PostPage({
                             >
                               {comment.username}
                             </Link>
+                            {isCommentByPostAuthor && (
+                              <AuthorBadge className="mr-1.5" />
+                            )}
                             <span className="text-foreground/90">{comment.text}</span>
                           </p>
                           <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
@@ -592,7 +601,7 @@ export default function PostPage({
                             >
                               {isExpanded ? "Ẩn câu trả lời" : "Xem câu trả lời"}
                             </button>
-                            {isCommentOwner ? (
+                            {canDeleteComment ? (
                               <button
                                 type="button"
                                 onClick={() => handleDeleteComment(comment)}
@@ -645,6 +654,10 @@ export default function PostPage({
                               ((reply.authorId && reply.authorId === user.id) ||
                                 reply.username === user.username)
                           )
+                          const isReplyByPostAuthor = Boolean(
+                            reply.authorId && postData?.authorId && reply.authorId === postData.authorId
+                          )
+                          const canDeleteReply = isReplyOwner || isOwner
                           return (
                             <div
                               key={reply.id}
@@ -666,6 +679,9 @@ export default function PostPage({
                                     >
                                       {reply.username}
                                     </Link>
+                                    {isReplyByPostAuthor && (
+                                      <AuthorBadge className="mr-1.5" />
+                                    )}
                                     <span className="text-foreground/90">
                                       {reply.text}
                                     </span>
@@ -675,7 +691,7 @@ export default function PostPage({
                                     {reply.likeCount > 0 && (
                                       <span>{reply.likeCount} lượt thích</span>
                                     )}
-                                    {isReplyOwner && (
+                                    {canDeleteReply && (
                                       <button
                                         type="button"
                                         onClick={() =>
