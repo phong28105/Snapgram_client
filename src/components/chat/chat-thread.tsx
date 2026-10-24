@@ -7,7 +7,8 @@ import { toast } from "sonner"
 import { useAuth } from "@/hooks/use-auth"
 import { useChat } from "@/hooks/use-chat"
 import { chatService } from "@/services/chat.service"
-import { mediaService } from "@/services/media.service"
+import { useMediaUpload } from "@/hooks/use-media-upload"
+import { UploadProgressCard } from "@/components/ui/upload-progress-card"
 import { MediaPicker, type PickedMedia } from "@/components/ui/media-picker"
 import { VerifiedBadge } from "@/components/ui/verified-badge"
 import { getErrorMessage } from "@/lib/api"
@@ -67,7 +68,8 @@ export function ChatThread({ conversationId, onBack, backAlwaysVisible = false }
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined)
   const [input, setInput] = useState("")
   const [isSending, setIsSending] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
+  const { uploading, upload } = useMediaUpload()
+  const isUploading = Boolean(uploading)
 
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
@@ -285,18 +287,12 @@ export function ChatThread({ conversationId, onBack, backAlwaysVisible = false }
       return
     }
 
-    // Ảnh: upload lên media-service trước, rồi gửi URL
-    setIsUploading(true)
+    // Ảnh: upload lên media-service (có tiến trình) trước, rồi gửi URL
     try {
-      const uploaded = await mediaService.upload(picked.file)
-      if (!uploaded?.url) {
-        throw new Error("Không nhận được URL ảnh")
-      }
-      await sendPayload({ content: "", type: "IMAGE", mediaUrl: uploaded.url })
+      const url = await upload(picked.file)
+      await sendPayload({ content: "", type: "IMAGE", mediaUrl: url })
     } catch (err) {
       toast.error(getErrorMessage(err, "Không tải được ảnh lên."))
-    } finally {
-      setIsUploading(false)
     }
   }
 
@@ -494,6 +490,11 @@ export function ChatThread({ conversationId, onBack, backAlwaysVisible = false }
       </div>
 
       {/* Composer */}
+      {uploading && (
+        <div className="px-2.5 pt-2">
+          <UploadProgressCard upload={uploading} compact />
+        </div>
+      )}
       <form
         onSubmit={handleSend}
         className="p-2.5 border-t border-border flex items-center gap-2 shrink-0"

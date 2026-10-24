@@ -20,16 +20,27 @@ export const mediaService = {
 
   /**
    * POST /api/media/upload — Direct Upload (Multipart)
-   * Khuyên dùng cho Avatar hoặc ảnh đơn giản
+   * `onProgress` nhận phần trăm 0–100 để hiển thị tiến trình cho người dùng.
    */
-  async upload(file: File): Promise<MediaResponse> {
+  async upload(
+    file: File,
+    onProgress?: (percent: number) => void
+  ): Promise<MediaResponse> {
     const formData = new FormData()
     formData.append("file", file)
     const res = await apiClient.post<MediaResponse>("/api/media/upload", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
+      onUploadProgress: (event) => {
+        if (!onProgress) return
+        const total = event.total ?? file.size
+        if (!total) return
+        // Giữ 99% cho tới khi server trả về để không "nhảy" 100% quá sớm
+        onProgress(Math.min(99, Math.round((event.loaded * 100) / total)))
+      },
     })
+    onProgress?.(100)
     return res.data
   },
 

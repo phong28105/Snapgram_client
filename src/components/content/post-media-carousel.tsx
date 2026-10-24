@@ -41,6 +41,7 @@ export function PostMediaCarousel({
 }: PostMediaCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isMuted, setIsMuted] = useState(true)
+  const [loadedMediaMap, setLoadedMediaMap] = useState<Record<string, boolean>>({})
 
   const mediaList = items.length > 0 ? items : [{ mediaUrl: "/profile.jpg" }]
   const currentMedia = mediaList[currentIndex] || mediaList[0]
@@ -88,14 +89,30 @@ export function PostMediaCarousel({
       )
     }
 
+    const isLoaded = Boolean(loadedMediaMap[currentMedia.mediaUrl])
+
     const imgElement = (
-      <img
-        src={currentMedia.mediaUrl}
-        alt={`${alt} (${currentIndex + 1})`}
-        className={`w-full h-full ${
-          objectFit === "contain" ? "object-contain" : "object-cover"
-        } select-none transition-transform duration-200`}
-      />
+      <div className="relative w-full h-full overflow-hidden bg-muted/40">
+        {!isLoaded && (
+          <div className="absolute inset-0 bg-muted/60 animate-pulse pointer-events-none" />
+        )}
+        <img
+          src={currentMedia.mediaUrl}
+          alt={`${alt} (${currentIndex + 1})`}
+          loading="lazy"
+          onLoad={() =>
+            setLoadedMediaMap((prev) => ({
+              ...prev,
+              [currentMedia.mediaUrl]: true,
+            }))
+          }
+          className={`w-full h-full ${
+            objectFit === "contain" ? "object-contain" : "object-cover"
+          } select-none transition-opacity duration-300 ${
+            isLoaded ? "opacity-100" : "opacity-0"
+          }`}
+        />
+      </div>
     )
 
     if (linkHref) {
@@ -111,7 +128,7 @@ export function PostMediaCarousel({
 
   return (
     <div
-      className={`relative w-full ${aspectRatioClassName} rounded-md overflow-hidden bg-black select-none ${className}`}
+      className={`relative w-full ${aspectRatioClassName} rounded-md overflow-hidden bg-muted/40 select-none ${className}`}
       onDoubleClick={onDoubleTap}
     >
       {/* Current media */}

@@ -32,7 +32,8 @@ import { ReportDialog } from "@/components/content/report-dialog"
 import { PostMediaCarousel } from "@/components/content/post-media-carousel"
 import { AuthorBadge } from "@/components/content/author-badge"
 import { MediaPicker, type PickedMedia } from "@/components/ui/media-picker"
-import { mediaService } from "@/services/media.service"
+import { UploadProgressCard } from "@/components/ui/upload-progress-card"
+import { useMediaUpload } from "@/hooks/use-media-upload"
 import { toast } from "sonner"
 import type { CommentMediaType, CommentResponse, PostResponse, ReportTargetType } from "@/types/content.type"
 
@@ -102,6 +103,8 @@ export default function PostModal({
   const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({})
   const [replyingTo, setReplyingTo] = useState<{ id: string; username: string } | null>(null)
   const [commentInput, setCommentInput] = useState("")
+  const { uploading: commentUpload, upload: uploadCommentImage } = useMediaUpload()
+  const isUploadingMedia = Boolean(commentUpload)
   const [isFollowing, setIsFollowing] = useState(false)
   const [reportTarget, setReportTarget] = useState<{
     type: ReportTargetType
@@ -380,11 +383,10 @@ export default function PostModal({
       return
     }
     try {
-      const uploaded = await mediaService.upload(picked.file)
-      if (!uploaded?.url) throw new Error("Không nhận được URL ảnh")
+      const url = await uploadCommentImage(picked.file)
       await submitComment({
         content: "",
-        mediaUrl: uploaded.url,
+        mediaUrl: url,
         mediaType: "IMAGE",
       })
     } catch (err) {
@@ -901,11 +903,19 @@ export default function PostModal({
           )}
 
           {/* Add comment input */}
+          {commentUpload && (
+            <div className="px-3.5 pt-2.5">
+              <UploadProgressCard upload={commentUpload} />
+            </div>
+          )}
           <form
             onSubmit={handleAddComment}
             className="flex items-center gap-2 px-3.5 py-3 border-t border-border/60 shrink-0"
           >
-            <MediaPicker onPick={handlePickCommentMedia} />
+            <MediaPicker
+              onPick={handlePickCommentMedia}
+              disabled={isUploadingMedia}
+            />
             <input
               ref={commentInputRef}
               type="text"

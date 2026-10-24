@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useCallback, useEffect, useState } from "react"
+import React, { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import TimeAgo from "@/components/ui/time-ago"
 import { BsThreeDots } from "react-icons/bs"
@@ -40,15 +40,21 @@ import { getErrorMessage } from "@/lib/api"
 import { EditPostDialog } from "@/components/content/edit-post-dialog"
 import { ReportDialog } from "@/components/content/report-dialog"
 import { toast } from "sonner"
-import type { CollectionResponse, ContentVisibility, PostResponse } from "@/types/content.type"
+import type { CollectionResponse, CommentMediaType, ContentVisibility, PostResponse } from "@/types/content.type"
 import { PostMediaCarousel } from "@/components/content/post-media-carousel"
 import { AuthorBadge } from "@/components/content/author-badge"
 import { VerifiedBadge } from "@/components/ui/verified-badge"
+import { MediaPicker, type PickedMedia } from "@/components/ui/media-picker"
+import { UploadProgressCard } from "@/components/ui/upload-progress-card"
+import { useMediaUpload } from "@/hooks/use-media-upload"
+import { FeedSkeleton } from "@/components/content/post-skeleton"
 
 interface CommentItem {
   id: string
   username: string
   text: string
+  mediaUrl?: string
+  mediaType?: CommentMediaType
   /** Có khi bình luận đến từ API (dùng để nhận biết bình luận của tác giả bài viết) */
   authorId?: string
 }
@@ -145,6 +151,8 @@ function PostCard({
   const [comments, setComments] = useState<CommentItem[]>(post.initialComments)
   const [commentInput, setCommentInput] = useState("")
   const [showHeartPop, setShowHeartPop] = useState(false)
+  const { uploading: commentUpload, upload: uploadCommentImage } = useMediaUpload()
+  const isUploadingMedia = Boolean(commentUpload)
 
   // Modals state
   const [isEditOpen, setIsEditOpen] = useState(false)
@@ -289,31 +297,68 @@ function PostCard({
     }
   }
 
-  const handleAddComment = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!commentInput.trim()) return
-
+  const submitCommentPayload = async (payload: {
+    content?: string
+    mediaUrl?: string
+    mediaType?: CommentMediaType
+  }) => {
     if (!isAuthenticated) {
       openLoginModal()
       return
     }
 
-    const content = commentInput.trim()
-    setCommentInput("")
-
     const optimistic: CommentItem = {
       id: Date.now().toString(),
       username: user?.username || "me",
-      text: content,
+      text: payload.content || "",
+      mediaUrl: payload.mediaUrl,
+      mediaType: payload.mediaType,
+      authorId: user?.id,
     }
     setComments((prev) => [...prev, optimistic])
 
     if (post.isReal) {
       try {
-        await contentService.createComment(post.id, { content })
+        await contentService.createComment(post.id, {
+          content: payload.content || undefined,
+          mediaUrl: payload.mediaUrl,
+          mediaType: payload.mediaType,
+        })
       } catch (err) {
         toast.error(getErrorMessage(err, "Không thể gửi bình luận."))
       }
+    }
+  }
+
+  const handleAddComment = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!commentInput.trim()) return
+    const content = commentInput.trim()
+    setCommentInput("")
+    await submitCommentPayload({ content })
+  }
+
+  const handlePickCommentMedia = async (picked: PickedMedia) => {
+    if (!isAuthenticated) {
+      openLoginModal()
+      return
+    }
+    if (isUploadingMedia) return
+
+    if (picked.kind === "STICKER") {
+      await submitCommentPayload({ content: picked.emoji, mediaType: "STICKER" })
+      return
+    }
+    if (picked.kind === "GIF") {
+      await submitCommentPayload({ mediaUrl: picked.url, mediaType: "GIF" })
+      return
+    }
+
+    try {
+      const url = await uploadCommentImage(picked.file)
+      await submitCommentPayload({ mediaUrl: url, mediaType: "IMAGE" })
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Không tải được ảnh lên."))
     }
   }
 
@@ -540,21 +585,44 @@ function PostCard({
                 c.username.toLowerCase() === post.author.username.toLowerCase())
           )
           return (
-            <div key={c.id} className="leading-tight">
-              <span className="font-semibold mr-1.5">{c.username}</span>
-              {isByPostAuthor && <AuthorBadge className="mr-1.5" />}
-              <span className="text-foreground/90">{c.text}</span>
+            <div key={c.id} className="leading-tight space-y-1">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-semibold">{c.username}</span>
+                {isByPostAuthor && <AuthorBadge />}
+                {c.mediaType === "STICKER" ? (
+                  <span className="text-2xl leading-none">{c.text}</span>
+                ) : (
+                  c.text && <span className="text-foreground/90">{c.text}</span>
+                )}
+              </div>
+              {c.mediaUrl && (
+                <div className="mt-0.5 rounded-lg overflow-hidden max-w-[140px] max-h-[140px] border border-border/50 bg-black/5">
+                  <img
+                    src={c.mediaUrl}
+                    alt="Bình luận ảnh"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
             </div>
           )
         })}
       </div>
 
       {/* Inline Comment Input Form */}
+      {commentUpload && (
+        <div className="px-1 pt-1.5">
+          <UploadProgressCard upload={commentUpload} compact />
+        </div>
+      )}
       <form
         onSubmit={handleAddComment}
         className="flex items-center gap-2 mt-2 pt-2 border-t border-border/40 px-1"
       >
-        <Smile className="w-4 h-4 text-muted-foreground shrink-0" />
+        <MediaPicker
+          onPick={handlePickCommentMedia}
+          disabled={isUploadingMedia}
+        />
         <input
           type="text"
           value={commentInput}
@@ -653,12 +721,18 @@ function PostCard({
 }
 
 export default function Pages() {
-  const { user, isAuthenticated } = useAuth()
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth()
   const [posts, setPosts] = useState<PostProps[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isRefetching, setIsRefetching] = useState(false)
+  const hasLoadedRef = useRef(false)
 
-  const loadFeed = useCallback(async () => {
-    setIsLoading(true)
+  const loadFeed = useCallback(async (isSoft = false) => {
+    if (isSoft && hasLoadedRef.current) {
+      setIsRefetching(true)
+    } else {
+      setIsLoading(true)
+    }
     try {
       let items: PostResponse[] = []
 
@@ -691,23 +765,29 @@ export default function Pages() {
         )
       )
       setPosts(mapped)
+      hasLoadedRef.current = true
     } catch {
-      setPosts([])
+      if (!isSoft) {
+        setPosts([])
+      }
     } finally {
       setIsLoading(false)
+      setIsRefetching(false)
     }
   }, [isAuthenticated, user?.id, user?.username, user?.avatarUrl, user?.verified, user?.verifiedUntil])
 
   useEffect(() => {
-    loadFeed()
-  }, [loadFeed])
+    if (!authLoading) {
+      loadFeed()
+    }
+  }, [authLoading, loadFeed])
 
   useEffect(() => {
     const handlePostCreated = () => {
-      loadFeed()
+      loadFeed(true)
     }
     const handleFollowUpdated = () => {
-      loadFeed()
+      loadFeed(true)
     }
 
     window.addEventListener("snapgram:post-created", handlePostCreated)
@@ -738,28 +818,8 @@ export default function Pages() {
     setPosts((prev) => prev.filter((item) => item.id !== id))
   }
 
-  if (isLoading) {
-    return (
-      <div className="w-full max-w-[470px] mx-auto space-y-6 pt-2">
-        {[1, 2].map((i) => (
-          <div key={i} className="border-b border-border/60 pb-5 space-y-3 animate-pulse">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-muted" />
-              <div className="space-y-1.5 flex-1">
-                <div className="h-3 w-28 bg-muted rounded" />
-                <div className="h-2 w-16 bg-muted rounded" />
-              </div>
-            </div>
-            <div className="aspect-square w-full rounded-md bg-muted" />
-            <div className="flex items-center gap-4 pt-1">
-              <div className="w-6 h-6 rounded-full bg-muted" />
-              <div className="w-6 h-6 rounded-full bg-muted" />
-              <div className="w-6 h-6 rounded-full bg-muted" />
-            </div>
-          </div>
-        ))}
-      </div>
-    )
+  if (authLoading || isLoading) {
+    return <FeedSkeleton count={3} />
   }
 
   if (posts.length === 0) {
@@ -789,6 +849,11 @@ export default function Pages() {
 
   return (
     <div className="w-full max-w-[470px] mx-auto space-y-2">
+      {isRefetching && (
+        <div className="h-0.5 w-full bg-primary/20 overflow-hidden rounded-full my-1">
+          <div className="h-full bg-primary animate-pulse w-1/3 mx-auto" />
+        </div>
+      )}
       {posts.map((post) => (
         <PostCard
           key={post.id}

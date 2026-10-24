@@ -125,7 +125,7 @@ export interface InteractionRequest {
 // ==========================================
 
 export interface CreateCommentRequest {
-  content: string;
+  content?: string;
   parentCommentId?: string;
   /** URL ảnh/GIF đã upload, hoặc emoji nếu là sticker. */
   mediaUrl?: string;

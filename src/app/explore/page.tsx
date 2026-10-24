@@ -89,12 +89,14 @@ function ExploreContent() {
   const [hashtagResults, setHashtagResults] = useState<HashtagResponse[]>([])
   const [recentSearches, setRecentSearches] = useState<UserProfileResponse[]>([])
   const [isSearching, setIsSearching] = useState(false)
+  const [isLoadingPosts, setIsLoadingPosts] = useState(true)
   const [apiTiles, setApiTiles] = useState<ExploreTile[]>([])
 
   const searchContainerRef = useRef<HTMLDivElement | null>(null)
 
   // Load explore posts từ API khi khởi tạo
   const loadExplorePosts = useCallback(async () => {
+    setIsLoadingPosts(true)
     try {
       const res = await contentService.getExplorePosts(0, 30)
       if (res.content && res.content.length > 0) {
@@ -102,6 +104,8 @@ function ExploreContent() {
       }
     } catch {
       // Fallback
+    } finally {
+      setIsLoadingPosts(false)
     }
   }, [])
 
@@ -111,6 +115,7 @@ function ExploreContent() {
 
   // Lọc bài viết theo hashtag khi người dùng chọn hashtag
   const loadPostsByTag = useCallback(async (tag: string) => {
+    setIsLoadingPosts(true)
     try {
       const postsRes = await contentService.getPostsByHashtag(tag, 0, 30)
       const list = postsRes.content || []
@@ -119,6 +124,8 @@ function ExploreContent() {
       }
     } catch {
       // Keep existing
+    } finally {
+      setIsLoadingPosts(false)
     }
   }, [])
 
@@ -483,7 +490,18 @@ function ExploreContent() {
       </div>
 
       {/* Explore Mosaic / Grid Layout Below */}
-      {filteredExploreItems.length === 0 ? (
+      {isLoadingPosts ? (
+        <div className="grid grid-cols-3 gap-1 md:gap-2 auto-rows-[140px] sm:auto-rows-[200px] md:auto-rows-[260px] pt-1">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div
+              key={i}
+              className={`rounded-sm bg-muted/60 animate-pulse ${
+                i % 6 === 2 ? "row-span-2 col-span-2" : "col-span-1 row-span-1"
+              }`}
+            />
+          ))}
+        </div>
+      ) : filteredExploreItems.length === 0 ? (
         <div className="py-20 text-center space-y-3">
           <div className="w-16 h-16 rounded-full border-2 border-dashed border-border flex items-center justify-center mx-auto text-muted-foreground">
             <Compass className="w-8 h-8 opacity-70" />

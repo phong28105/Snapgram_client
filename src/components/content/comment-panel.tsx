@@ -7,7 +7,8 @@ import { toast } from "sonner"
 import { useAuth } from "@/hooks/use-auth"
 import { useLoginModal } from "@/components/providers/login-modal-provider"
 import { contentService } from "@/services/content.service"
-import { mediaService } from "@/services/media.service"
+import { useMediaUpload } from "@/hooks/use-media-upload"
+import { UploadProgressCard } from "@/components/ui/upload-progress-card"
 import { MediaPicker, type PickedMedia } from "@/components/ui/media-picker"
 import { AuthorBadge } from "@/components/content/author-badge"
 import { VerifiedBadge } from "@/components/ui/verified-badge"
@@ -92,7 +93,8 @@ export function CommentPanel({
   const [replyingTo, setReplyingTo] = useState<{ id: string; username: string } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
+  const { uploading, upload } = useMediaUpload()
+  const isUploading = Boolean(uploading)
   const [input, setInput] = useState("")
   const inputRef = useRef<HTMLInputElement | null>(null)
   const listRef = useRef<HTMLDivElement | null>(null)
@@ -243,18 +245,13 @@ export function CommentPanel({
       return
     }
 
-    setIsUploading(true)
     try {
-      const uploaded = await mediaService.upload(picked.file)
-      if (!uploaded?.url) throw new Error("Không nhận được URL ảnh")
-      await submitComment({ content: "", mediaUrl: uploaded.url, mediaType: "IMAGE" })
+      const url = await upload(picked.file)
+      await submitComment({ content: "", mediaUrl: url, mediaType: "IMAGE" })
     } catch (err) {
       toast.error(getErrorMessage(err, "Không tải được ảnh lên."))
-    } finally {
-      setIsUploading(false)
     }
   }
-
   const handleToggleLikeComment = async (comment: CommentItem, isReply = false, parentId?: string) => {
     requireAuth(async () => {
       const nextLiked = !comment.likedByMe
@@ -506,6 +503,11 @@ export function CommentPanel({
         onSubmit={handleSubmit}
         className="border-t border-border px-3 py-2.5 shrink-0"
       >
+        {uploading && (
+          <div className="mb-2">
+            <UploadProgressCard upload={uploading} />
+          </div>
+        )}
         {replyingTo && (
           <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1.5">
             <span>

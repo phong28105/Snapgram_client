@@ -45,13 +45,14 @@ interface StoryItem {
 }
 
 export default function Stories() {
-  const { user, isAuthenticated } = useAuth()
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth()
   const { openLoginModal } = useLoginModal()
 
   const containerRef = useRef<HTMLUListElement | null>(null)
   const storyFileInputRef = useRef<HTMLInputElement | null>(null)
 
   const [stories, setStories] = useState<StoryItem[]>([])
+  const [isLoadingStories, setIsLoadingStories] = useState(true)
   const [isAtStart, setIsAtStart] = useState(true)
   const [isAtEnd, setIsAtEnd] = useState(false)
 
@@ -76,6 +77,7 @@ export default function Stories() {
   const [isLoadingViewers, setIsLoadingViewers] = useState(false)
 
   const loadStoryFeed = useCallback(async () => {
+    setIsLoadingStories(true)
     try {
       const res = await contentService.getStoryFeed(0, 20)
       if (res.content && res.content.length > 0) {
@@ -103,12 +105,16 @@ export default function Stories() {
       }
     } catch {
       setStories([])
+    } finally {
+      setIsLoadingStories(false)
     }
   }, [user?.id, user?.username, user?.avatarUrl])
 
   useEffect(() => {
-    loadStoryFeed()
-  }, [loadStoryFeed])
+    if (!authLoading) {
+      loadStoryFeed()
+    }
+  }, [authLoading, loadStoryFeed])
 
   const handleScroll = (type: "next" | "prev") => {
     if (!containerRef?.current) return
@@ -350,30 +356,42 @@ export default function Stories() {
         </li>
 
         {/* Story Feed Items */}
-        {stories.map((story, index) => (
-          <li
-            key={story.id}
-            onClick={() => openStory(index)}
-            className="shrink-0 flex flex-col items-center gap-1.5 cursor-pointer select-none group"
-          >
-            <div
-              className={`p-[2px] rounded-full transition group-hover:scale-105 duration-200 ${
-                story.viewedByMe
-                  ? "bg-border"
-                  : "bg-gradient-to-tr from-amber-400 via-rose-500 to-fuchsia-600"
-              }`}
+        {authLoading || isLoadingStories ? (
+          Array.from({ length: 5 }).map((_, i) => (
+            <li
+              key={`story-skel-${i}`}
+              className="shrink-0 flex flex-col items-center gap-1.5 animate-pulse select-none"
             >
-              <img
-                src={story.avatar}
-                alt={story.username}
-                className="w-14 h-14 object-cover rounded-full bg-background p-0.5"
-              />
-            </div>
-            <span className="text-[11px] font-light tracking-tight truncate max-w-[64px]">
-              {story.username}
-            </span>
-          </li>
-        ))}
+              <div className="w-[62px] h-[62px] rounded-full bg-muted/70 p-[2px]" />
+              <div className="h-2.5 w-12 bg-muted/60 rounded" />
+            </li>
+          ))
+        ) : (
+          stories.map((story, index) => (
+            <li
+              key={story.id}
+              onClick={() => openStory(index)}
+              className="shrink-0 flex flex-col items-center gap-1.5 cursor-pointer select-none group"
+            >
+              <div
+                className={`p-[2px] rounded-full transition group-hover:scale-105 duration-200 ${
+                  story.viewedByMe
+                    ? "bg-border"
+                    : "bg-gradient-to-tr from-amber-400 via-rose-500 to-fuchsia-600"
+                }`}
+              >
+                <img
+                  src={story.avatar}
+                  alt={story.username}
+                  className="w-14 h-14 object-cover rounded-full bg-background p-0.5"
+                />
+              </div>
+              <span className="text-[11px] font-light tracking-tight truncate max-w-[64px]">
+                {story.username}
+              </span>
+            </li>
+          ))
+        )}
       </ul>
 
       {/* Story Viewer Dialog */}
