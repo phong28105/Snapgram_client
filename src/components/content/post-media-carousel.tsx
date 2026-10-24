@@ -2,6 +2,7 @@
 
 import React, { useState } from "react"
 import Link from "next/link"
+import { safePoster } from "@/lib/media"
 import {
   ChevronLeft,
   ChevronRight,
@@ -74,7 +75,7 @@ export function PostMediaCarousel({
         <video
           key={currentMedia.mediaUrl}
           src={currentMedia.mediaUrl}
-          poster={currentMedia.thumbnailUrl}
+          poster={safePoster(currentMedia.thumbnailUrl, currentMedia.mediaUrl)}
           autoPlay
           loop
           muted={isMuted}
