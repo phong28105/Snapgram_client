@@ -236,6 +236,25 @@ export default function ReelsPage() {
   const currentReel = reels[currentIndex]
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const touchStartY = useRef<number | null>(null)
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartY.current === null) return
+    const deltaY = e.changedTouches[0].clientY - touchStartY.current
+    touchStartY.current = null
+
+    // Vuốt lên: xem reel tiếp theo
+    if (deltaY < -45 && currentIndex < reels.length - 1) {
+      handleNext()
+    } else if (deltaY > 45 && currentIndex > 0) {
+      // Vuốt xuống: lùi về reel trước
+      handlePrev()
+    }
+  }
 
   useEffect(() => {
     const video = videoRef.current
@@ -485,12 +504,16 @@ export default function ReelsPage() {
       <Sidebar />
 
       {/* Main Reels Container */}
-      <div className="flex-1 flex flex-col items-center justify-center min-w-0 py-4 px-2 sm:px-4">
+      <div className="flex-1 flex flex-col items-center justify-between sm:justify-center min-w-0 w-full py-0 sm:py-4 px-0 sm:px-4">
         <Navbar />
 
-        <div className="flex items-center gap-4 my-auto">
+        <div className="flex items-center justify-center sm:gap-4 my-auto w-full max-w-[390px] sm:max-w-none px-2 sm:px-0">
           {/* Reel Video Card */}
-          <div className="relative w-[340px] sm:w-[380px] h-[640px] sm:h-[720px] rounded-2xl overflow-hidden bg-black shadow-2xl flex items-center justify-center select-none group">
+          <div
+            className="relative w-full sm:w-[380px] h-[calc(100dvh-130px)] sm:h-[720px] max-h-[720px] rounded-2xl overflow-hidden bg-black shadow-2xl flex items-center justify-center select-none group touch-pan-y"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
             {/* Visual Media Background */}
             <video
               key={currentReel.id}
@@ -539,8 +562,67 @@ export default function ReelsPage() {
               </button>
             </div>
 
+            {/* Mobile Interaction Buttons (Floating overlay on bottom right inside video) */}
+            <div className="absolute right-2.5 bottom-16 sm:hidden z-20 flex flex-col items-center gap-3.5 text-white drop-shadow-md">
+              <div className="flex flex-col items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => handleToggleLike(currentReel.id, currentReel.initialLikes)}
+                  className="p-2 rounded-full bg-black/40 hover:bg-black/60 active:scale-125 transition"
+                  aria-label="Thích thước phim"
+                >
+                  <Heart
+                    className={`w-6 h-6 transition-colors ${
+                      isLiked ? "text-rose-500 fill-rose-500" : "text-white"
+                    }`}
+                  />
+                </button>
+                <span className="text-[10px] font-semibold text-white drop-shadow">
+                  {likesCount.toLocaleString("vi-VN")}
+                </span>
+              </div>
+
+              <div className="flex flex-col items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => setShowComments((v) => !v)}
+                  className={`p-2 rounded-full transition ${
+                    showComments ? "bg-white/30" : "bg-black/40 hover:bg-black/60"
+                  }`}
+                  aria-label="Xem bình luận"
+                >
+                  <MessageCircle className="w-6 h-6 -rotate-90 text-white" />
+                </button>
+                <span className="text-[10px] font-semibold text-white drop-shadow">
+                  {commentsCount.toLocaleString("vi-VN")}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleShareReel(currentReel.id)}
+                className="p-2 rounded-full bg-black/40 hover:bg-black/60 transition"
+                aria-label="Chia sẻ thước phim"
+              >
+                <Send className="w-5 h-5 -rotate-12 text-white" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleToggleBookmark(currentReel.id)}
+                className="p-2 rounded-full bg-black/40 hover:bg-black/60 transition"
+                aria-label="Lưu thước phim"
+              >
+                <Bookmark
+                  className={`w-5 h-5 transition-colors ${
+                    isBookmarked ? "text-white fill-white" : "text-white"
+                  }`}
+                />
+              </button>
+            </div>
+
             {/* Bottom Overlay: Author & Caption */}
-            <div className="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent text-white space-y-3 z-10">
+            <div className="absolute bottom-0 inset-x-0 p-4 pr-16 sm:pr-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent text-white space-y-3 z-10">
               {/* Author Row */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -592,8 +674,8 @@ export default function ReelsPage() {
             </div>
           </div>
 
-          {/* Reel Interaction Buttons (Floating beside the card) */}
-          <div className="flex flex-col items-center gap-5 shrink-0 text-foreground">
+          {/* Reel Interaction Buttons (Floating beside the card on desktop only) */}
+          <div className="hidden sm:flex flex-col items-center gap-5 shrink-0 text-foreground">
             {/* Like Button */}
             <div className="flex flex-col items-center gap-1">
               <button

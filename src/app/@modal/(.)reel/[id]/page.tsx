@@ -220,10 +220,10 @@ export default function ReelModal({
         if (!open) router.back()
       }}
     >
-      <DialogContent hideCloseButton className="max-w-[420px] p-0 overflow-hidden border-border bg-black sm:rounded-2xl shadow-2xl">
+      <DialogContent hideCloseButton className="w-full max-w-[420px] p-0 overflow-hidden border-border bg-black sm:rounded-2xl shadow-2xl">
         <DialogTitle className="sr-only">Reel {reelId}</DialogTitle>
 
-        <div className="relative w-full h-[640px] bg-black flex items-center justify-center select-none">
+        <div className="relative w-full h-[calc(100dvh-24px)] sm:h-[640px] max-h-[720px] bg-black flex items-center justify-center select-none">
           <video
             ref={videoRef}
             src={mediaUrl}

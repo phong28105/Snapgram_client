@@ -71,9 +71,9 @@ function PageShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen flex bg-background">
       <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0 max-w-5xl mx-auto pb-12">
+      <div className="flex-1 flex flex-col min-w-0 max-w-5xl mx-auto">
         <Navbar />
-        <main className="px-4 md:px-12 pt-6 md:pt-10 w-full max-w-4xl mx-auto">{children}</main>
+        <main className="px-4 md:px-12 pt-6 md:pt-10 pb-16 md:pb-12 w-full max-w-4xl mx-auto">{children}</main>
         <Navbot />
       </div>
     </div>

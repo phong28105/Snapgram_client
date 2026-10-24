@@ -483,10 +483,10 @@ export default function PostPage({
       </header>
 
       {/* Main Post Container */}
-      <main className="flex-1 flex items-center justify-center p-4 md:p-8">
-        <div className="w-full max-w-4xl border border-border rounded-xl overflow-hidden bg-card shadow-lg flex flex-col md:flex-row min-h-[540px] max-h-[82vh]">
+      <main className="flex-1 flex items-center justify-center p-0 sm:p-4 md:p-8">
+        <div className="w-full max-w-4xl border-0 sm:border border-border rounded-none sm:rounded-xl overflow-hidden bg-card shadow-lg flex flex-col md:flex-row min-h-0 md:min-h-[540px] md:max-h-[82vh]">
           {/* Left: Media */}
-          <div className="flex-1 bg-black flex items-center justify-center overflow-hidden min-h-[300px]">
+          <div className="w-full md:flex-1 bg-black flex items-center justify-center overflow-hidden min-h-[280px] sm:min-h-[360px] md:min-h-[400px]">
             <PostMediaCarousel
               items={
                 postData?.mediaItems && postData.mediaItems.length > 0
@@ -494,7 +494,7 @@ export default function PostPage({
                   : [{ mediaUrl: postMediaUrl }]
               }
               alt={`Post ${postId}`}
-              aspectRatioClassName="w-full h-full min-h-[300px]"
+              aspectRatioClassName="w-full aspect-square md:aspect-auto md:h-full"
               objectFit="contain"
             />
           </div>

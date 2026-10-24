@@ -9,10 +9,10 @@ export function ProfileSkeleton() {
     <div className="min-h-screen flex bg-background">
       <Sidebar />
 
-      <div className="flex-1 flex flex-col min-w-0 max-w-5xl mx-auto pb-12">
+      <div className="flex-1 flex flex-col min-w-0 max-w-5xl mx-auto">
         <Navbar />
 
-        <div className="px-4 md:px-12 pt-6 md:pt-10 max-w-4xl w-full mx-auto space-y-8 animate-pulse">
+        <div className="px-4 md:px-12 pt-6 md:pt-10 pb-16 md:pb-12 max-w-4xl w-full mx-auto space-y-8 animate-pulse">
           {/* Profile Header Skeleton */}
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 sm:gap-12">
             {/* Avatar skeleton */}

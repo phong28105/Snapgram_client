@@ -497,7 +497,7 @@ export function ChatThread({ conversationId, onBack, backAlwaysVisible = false }
       )}
       <form
         onSubmit={handleSend}
-        className="p-2.5 border-t border-border flex items-center gap-2 shrink-0"
+        className="p-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] border-t border-border flex items-center gap-2 shrink-0 bg-background"
       >
         <MediaPicker onPick={handlePickMedia} disabled={isSending || isUploading} />
         <input

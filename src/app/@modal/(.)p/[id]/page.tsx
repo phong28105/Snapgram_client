@@ -424,11 +424,11 @@ export default function PostModal({
         }
       }}
     >
-      <DialogContent hideCloseButton className="max-w-4xl p-0 overflow-hidden border-border bg-background sm:rounded-xl shadow-2xl h-[85vh] max-h-[700px] flex flex-col md:flex-row">
+      <DialogContent hideCloseButton className="w-full max-w-4xl p-0 overflow-hidden border-border bg-background sm:rounded-xl shadow-2xl h-[92vh] md:h-[85vh] max-h-[760px] flex flex-col md:flex-row">
         <DialogTitle className="sr-only">Chi tiết bài viết {postId}</DialogTitle>
 
         {/* Left: Post Media Carousel */}
-        <div className="flex-1 bg-black flex items-center justify-center overflow-hidden min-h-[280px]">
+        <div className="bg-black flex items-center justify-center overflow-hidden h-[38vh] sm:h-[42vh] md:h-auto md:flex-1 shrink-0">
           <PostMediaCarousel
             items={
               postData?.mediaItems && postData.mediaItems.length > 0
@@ -436,13 +436,13 @@ export default function PostModal({
                 : [{ mediaUrl: postMediaUrl }]
             }
             alt={`Post ${postId}`}
-            aspectRatioClassName="w-full h-full min-h-[280px]"
+            aspectRatioClassName="w-full h-full"
             objectFit="contain"
           />
         </div>
 
         {/* Right: Comments & Interactions */}
-        <div className="w-full md:w-[360px] lg:w-[400px] flex flex-col border-t md:border-t-0 md:border-l border-border bg-card">
+        <div className="w-full md:w-[360px] lg:w-[400px] flex-1 md:flex-none flex flex-col min-h-0 border-t md:border-t-0 md:border-l border-border bg-card">
           {/* Author Header */}
           <div className="p-3.5 border-b border-border/60 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2.5">

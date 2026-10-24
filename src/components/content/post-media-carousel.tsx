@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useRef, useState } from "react"
 import Link from "next/link"
 import { safePoster } from "@/lib/media"
 import {
@@ -42,6 +42,8 @@ export function PostMediaCarousel({
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isMuted, setIsMuted] = useState(true)
   const [loadedMediaMap, setLoadedMediaMap] = useState<Record<string, boolean>>({})
+  const touchStartX = useRef<number | null>(null)
+  const touchStartY = useRef<number | null>(null)
 
   const mediaList = items.length > 0 ? items : [{ mediaUrl: "/profile.jpg" }]
   const currentMedia = mediaList[currentIndex] || mediaList[0]
@@ -62,6 +64,35 @@ export function PostMediaCarousel({
     e.preventDefault()
     e.stopPropagation()
     setCurrentIndex((prev) => Math.min(mediaList.length - 1, prev + 1))
+  }
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (mediaList.length <= 1) return
+    touchStartX.current = e.touches[0].clientX
+    touchStartY.current = e.touches[0].clientY
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (
+      touchStartX.current === null ||
+      touchStartY.current === null ||
+      mediaList.length <= 1
+    ) {
+      return
+    }
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current
+    const deltaY = e.changedTouches[0].clientY - touchStartY.current
+    touchStartX.current = null
+    touchStartY.current = null
+
+    // Chỉ chuyển slide nếu vuốt ngang rõ rệt hơn vuốt dọc (tránh ngắt cuộn trang)
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 40) {
+      if (deltaX < 0 && currentIndex < mediaList.length - 1) {
+        setCurrentIndex((prev) => prev + 1)
+      } else if (deltaX > 0 && currentIndex > 0) {
+        setCurrentIndex((prev) => prev - 1)
+      }
+    }
   }
 
   const handleToggleMute = (e: React.MouseEvent) => {
@@ -128,8 +159,10 @@ export function PostMediaCarousel({
 
   return (
     <div
-      className={`relative w-full ${aspectRatioClassName} rounded-md overflow-hidden bg-muted/40 select-none ${className}`}
+      className={`relative w-full ${aspectRatioClassName} rounded-md overflow-hidden bg-muted/40 select-none touch-pan-y ${className}`}
       onDoubleClick={onDoubleTap}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
     >
       {/* Current media */}
       <div className="w-full h-full flex items-center justify-center">

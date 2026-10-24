@@ -14,9 +14,9 @@ const Navbot = () => {
   const { unreadTotal: chatUnread } = useChat()
 
   return (
-    <nav className="block md:hidden sticky bottom-0 z-20">
-      <div className="py-3.5 flex items-center bg-background border-t border-border">
-        <ul className="flex flex-row w-full justify-evenly items-stretch">
+    <nav className="block md:hidden sticky bottom-0 z-20 shrink-0 w-full">
+      <div className="pt-2 pb-[max(0.625rem,env(safe-area-inset-bottom))] flex items-center bg-background/95 backdrop-blur-md border-t border-border">
+        <ul className="flex flex-row w-full justify-around items-center px-1">
           {sidebarLists.map((sidebarList, sidebarListIndex) => {
             if (sidebarList.title === "Thông báo") return null
 
@@ -34,7 +34,7 @@ const Navbot = () => {
             if (sidebarList.title === "Tạo") {
               return (
                 <CreatePost key={sidebarListIndex}>
-                  <li className="cursor-pointer">
+                  <li className="cursor-pointer p-2 flex items-center justify-center rounded-lg hover:bg-accent transition">
                     <DisplayIcon list={itemWithAvatar} />
                   </li>
                 </CreatePost>
@@ -44,7 +44,7 @@ const Navbot = () => {
             if (sidebarList.title === "Tin nhắn") {
               return (
                 <Link key={sidebarListIndex} href="/messages">
-                  <li className="cursor-pointer">
+                  <li className="cursor-pointer p-2 flex items-center justify-center rounded-lg hover:bg-accent transition">
                     <DisplayIcon list={itemWithAvatar} messageCount={chatUnread} />
                   </li>
                 </Link>
@@ -52,7 +52,7 @@ const Navbot = () => {
             }
 
             const iconContent = (
-              <li className="cursor-pointer">
+              <li className="cursor-pointer p-2 flex items-center justify-center rounded-lg hover:bg-accent transition">
                 <DisplayIcon list={itemWithAvatar} />
               </li>
             )

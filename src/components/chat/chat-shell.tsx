@@ -33,7 +33,9 @@ export function ChatShell({ activeId }: ChatShellProps) {
     <div className="h-screen flex bg-background overflow-hidden">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
-        <Navbar />
+        <div className={activeId ? "hidden md:block" : "block"}>
+          <Navbar />
+        </div>
 
         <div className="flex-1 flex min-h-0 min-w-0 border-t border-border">
           {/* Cột danh sách: ẩn trên mobile khi đang mở hội thoại */}
@@ -69,7 +71,9 @@ export function ChatShell({ activeId }: ChatShellProps) {
           </section>
         </div>
 
-        <Navbot />
+        <div className={activeId ? "hidden md:block" : "block"}>
+          <Navbot />
+        </div>
       </div>
     </div>
   )

@@ -261,7 +261,7 @@ function ExploreContent() {
       : allTiles.filter((item) => item.category === activeCategory)
 
   return (
-    <div className="px-3 md:px-8 pt-4 md:pt-6 space-y-5 relative">
+    <div className="px-3 md:px-8 pt-4 md:pt-6 pb-16 md:pb-12 space-y-5 relative">
       {/* Backdrop làm tối phần lưới bên dưới khi đang mở khung tìm kiếm */}
       {isSearchFocused && (
         <div
@@ -587,7 +587,7 @@ export default function ExplorePage() {
       <Sidebar />
 
       {/* Main Explore Container */}
-      <div className="flex-1 flex flex-col min-w-0 max-w-5xl mx-auto pb-12">
+      <div className="flex-1 flex flex-col min-w-0 max-w-5xl mx-auto">
         <Navbar />
         <Suspense fallback={<div className="p-8 text-center text-xs text-muted-foreground">Đang tải...</div>}>
           <ExploreContent />

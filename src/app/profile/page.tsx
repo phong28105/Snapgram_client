@@ -335,10 +335,10 @@ export default function ProfilePage() {
       <Sidebar />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 max-w-5xl mx-auto pb-12">
+      <div className="flex-1 flex flex-col min-w-0 max-w-5xl mx-auto">
         <Navbar />
 
-        <div className="px-4 md:px-12 pt-6 md:pt-10 max-w-4xl w-full mx-auto space-y-8">
+        <div className="px-4 md:px-12 pt-6 md:pt-10 pb-16 md:pb-12 max-w-4xl w-full mx-auto space-y-8">
           {/* Profile Header */}
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 sm:gap-12">
             {/* Avatar + 24h Note Bubble */}

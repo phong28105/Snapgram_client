@@ -2,7 +2,7 @@
 
 import React, { use, useCallback, useEffect, useState } from "react"
 import Link from "next/link"
-import { notFound } from "next/navigation"
+import { notFound, useRouter } from "next/navigation"
 import {
   Ban,
   Camera,
@@ -43,6 +43,7 @@ import { HighlightViewer } from "@/components/content/highlight-viewer"
 import { ProfileSkeleton } from "@/components/profile/profile-skeleton"
 import { userService } from "@/services/user.service"
 import { contentService } from "@/services/content.service"
+import { chatService } from "@/services/chat.service"
 import { getErrorMessage } from "@/lib/api"
 import type { NoteResponse, UserProfileResponse } from "@/types/user.type"
 import type { HighlightResponse } from "@/types/content.type"
@@ -68,6 +69,7 @@ export default function PublicUserProfilePage({
 
   const { user: currentUser, isAuthenticated, refreshUser } = useAuth()
   const { openLoginModal } = useLoginModal()
+  const router = useRouter()
 
   const [profile, setProfile] = useState<UserProfileResponse | null>(null)
   const [note, setNote] = useState<NoteResponse | null>(null)
@@ -332,8 +334,20 @@ export default function PublicUserProfilePage({
   }
 
   const handleMessageClick = () => {
-    requireAuth(() => {
-      toast.info("Tính năng Tin nhắn sẽ sớm ra mắt khi có API!")
+    requireAuth(async () => {
+      if (!profile?.id) {
+        router.push("/messages")
+        return
+      }
+      try {
+        const conv = await chatService.getOrCreateDirectConversation({
+          targetUserId: profile.id,
+        })
+        router.push(`/messages/${conv.id}`)
+      } catch (err) {
+        toast.error(getErrorMessage(err, "Không thể mở cuộc trò chuyện."))
+        router.push("/messages")
+      }
     })
   }
 
@@ -387,7 +401,7 @@ export default function PublicUserProfilePage({
     <div className="min-h-screen flex bg-background">
       <Sidebar />
 
-      <div className="flex-1 flex flex-col min-w-0 max-w-5xl mx-auto pb-12">
+      <div className="flex-1 flex flex-col min-w-0 max-w-5xl mx-auto">
         <Navbar />
 
         {/* Bạn đã chặn tài khoản này — hiện băng báo thay vì 404 */}
@@ -409,7 +423,7 @@ export default function PublicUserProfilePage({
           </div>
         )}
 
-        <div className="px-4 md:px-12 pt-6 md:pt-10 max-w-4xl w-full mx-auto space-y-8">
+        <div className="px-4 md:px-12 pt-6 md:pt-10 pb-16 md:pb-12 max-w-4xl w-full mx-auto space-y-8">
           {/* Profile Header */}
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 sm:gap-12">
               {/* Avatar + Note */}

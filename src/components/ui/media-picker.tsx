@@ -135,7 +135,7 @@ export function MediaPicker({ onPick, disabled, tabs }: MediaPickerProps) {
       </button>
 
       {open && (
-        <div className="absolute bottom-full right-0 mb-2 w-[300px] rounded-xl border border-border bg-popover shadow-2xl z-50 overflow-hidden">
+        <div className="absolute bottom-full left-0 mb-2 w-[285px] sm:w-[320px] max-w-[calc(100vw-24px)] rounded-xl border border-border bg-popover shadow-2xl z-50 overflow-hidden">
           <div className="flex items-center justify-between px-2 pt-2">
             <div className="flex gap-1">
               {allowed.includes("image") && (

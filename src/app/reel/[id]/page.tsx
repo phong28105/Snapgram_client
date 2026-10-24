@@ -244,10 +244,10 @@ export default function ReelPage({
       </header>
 
       {/* Main Reel Card */}
-      <main className="flex-1 flex items-center justify-center p-4">
-        <div className="flex items-center gap-4">
+      <main className="flex-1 flex items-center justify-center p-2 sm:p-4">
+        <div className="flex items-center justify-center sm:gap-4 w-full max-w-[390px] sm:max-w-none">
           <div
-            className="relative w-[340px] sm:w-[380px] h-[620px] sm:h-[680px] rounded-2xl overflow-hidden bg-black shadow-2xl flex items-center justify-center select-none"
+            className="relative w-full sm:w-[380px] h-[calc(100dvh-120px)] sm:h-[680px] max-h-[720px] rounded-2xl overflow-hidden bg-black shadow-2xl flex items-center justify-center select-none"
             onDoubleClick={handleToggleLike}
           >
             <video
@@ -281,7 +281,56 @@ export default function ReelPage({
               </button>
             </div>
 
-            <div className="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent text-white space-y-3 z-10">
+            {/* Mobile Interaction Buttons Overlay */}
+            <div className="absolute right-2.5 bottom-16 sm:hidden z-20 flex flex-col items-center gap-3.5 text-white drop-shadow-md">
+              <div className="flex flex-col items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={handleToggleLike}
+                  className="p-2 rounded-full bg-black/40 hover:bg-black/60 active:scale-125 transition"
+                  aria-label="Thích"
+                >
+                  <Heart className={`w-6 h-6 ${isLiked ? "text-rose-500 fill-rose-500" : "text-white"}`} />
+                </button>
+                <span className="text-[10px] font-semibold text-white drop-shadow">{likesCount.toLocaleString("vi-VN")}</span>
+              </div>
+
+              <div className="flex flex-col items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => setShowComments((v) => !v)}
+                  className={`p-2 rounded-full transition ${
+                    showComments ? "bg-white/30" : "bg-black/40 hover:bg-black/60"
+                  }`}
+                  aria-label="Xem bình luận"
+                >
+                  <MessageCircle className="w-6 h-6 -rotate-90 text-white" />
+                </button>
+                <span className="text-[10px] font-semibold text-white drop-shadow">
+                  {commentsCount.toLocaleString("vi-VN")}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleShare}
+                className="p-2 rounded-full bg-black/40 hover:bg-black/60 transition"
+                aria-label="Chia sẻ"
+              >
+                <Send className="w-5 h-5 -rotate-12 text-white" />
+              </button>
+
+              <button
+                type="button"
+                onClick={handleToggleBookmark}
+                className="p-2 rounded-full bg-black/40 hover:bg-black/60 transition"
+                aria-label="Lưu"
+              >
+                <Bookmark className={`w-5 h-5 ${isBookmarked ? "fill-white text-white" : "text-white"}`} />
+              </button>
+            </div>
+
+            <div className="absolute bottom-0 inset-x-0 p-4 pr-16 sm:pr-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent text-white space-y-3 z-10">
               <div className="flex items-center gap-2.5">
                 <Link href={`/u/${authorName}`}>
                   <img
@@ -321,7 +370,7 @@ export default function ReelPage({
                   </button>
                 )}
               </div>
-              <p className="text-xs leading-relaxed text-white/90">
+              <p className="text-xs leading-relaxed text-white/90 line-clamp-2">
                 {caption}
               </p>
               <div className="flex items-center gap-2 text-[11px] text-white/80">
@@ -331,7 +380,7 @@ export default function ReelPage({
             </div>
           </div>
 
-          <div className="flex flex-col items-center gap-5 shrink-0 text-foreground">
+          <div className="hidden sm:flex flex-col items-center gap-5 shrink-0 text-foreground">
             <div className="flex flex-col items-center gap-1">
               <button
                 type="button"
