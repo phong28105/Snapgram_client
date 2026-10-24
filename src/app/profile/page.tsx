@@ -34,6 +34,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { VerifiedBadge } from "@/components/ui/verified-badge"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/hooks/use-auth"
 import { useLoginModal } from "@/components/providers/login-modal-provider"
@@ -375,6 +376,10 @@ export default function ProfilePage() {
               <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                 <div className="flex items-center justify-center sm:justify-start gap-2">
                   <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">{username}</h1>
+                  <VerifiedBadge
+                    verified={profile?.verified ?? user?.verified}
+                    verifiedUntil={profile?.verifiedUntil ?? user?.verifiedUntil}
+                  />
                   {profile?.privateAccount && (
                     <span title="Tài khoản riêng tư" className="text-muted-foreground">
                       <Lock className="w-4 h-4" />

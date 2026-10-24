@@ -10,6 +10,8 @@ export interface UserMe {
   effectivePermissions?: string[]
   avatarUrl?: string
   emailVerified?: boolean
+  verified?: boolean
+  verifiedUntil?: string
   createdAt?: string
 }
 

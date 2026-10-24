@@ -8,6 +8,7 @@ const AUTH_PAGES = ["/login", "/register", "/forgot-password", "/reset-password"
 function isPublicContentPath(pathname: string): boolean {
   return (
     pathname === "/verify-email" ||
+    pathname === "/payment/result" ||
     pathname === "/explore" ||
     pathname === "/reels" ||
     pathname.startsWith("/p/") ||
@@ -39,7 +40,8 @@ export function proxy(request: NextRequest) {
   // Chưa login mà vào trang gốc (/) hoặc trang cá nhân (/profile, /settings...) -> đẩy ra /login
   if (!userToken && !isAuthPage) {
     const url = new URL("/login", request.url)
-    if (pathname !== "/") url.searchParams.set("redirect", pathname)
+    const redirectTo = `${pathname}${request.nextUrl.search}`
+    if (redirectTo !== "/") url.searchParams.set("redirect", redirectTo)
     return NextResponse.redirect(url)
   }
 
