@@ -52,6 +52,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fetchCurrentUser()
   }, [fetchCurrentUser])
 
+  // Khi quay lại tab (vd: từ cổng thanh toán) → làm mới hồ sơ để huy hiệu tích xanh
+  // hiện ngay, không phải tải lại trang.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        fetchCurrentUser()
+      }
+    }
+    window.addEventListener("focus", onVisible)
+    document.addEventListener("visibilitychange", onVisible)
+    return () => {
+      window.removeEventListener("focus", onVisible)
+      document.removeEventListener("visibilitychange", onVisible)
+    }
+  }, [fetchCurrentUser])
+
   // Gửi heartbeat định kỳ mỗi 2 phút khi đã đăng nhập
   useEffect(() => {
     if (!user) return

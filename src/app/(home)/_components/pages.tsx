@@ -86,7 +86,9 @@ function mapPostResponseToCard(
   p: PostResponse,
   currentUserId?: string,
   currentUsername?: string,
-  currentAvatar?: string
+  currentAvatar?: string,
+  currentUserVerified?: boolean,
+  currentUserVerifiedUntil?: string
 ): PostProps {
   const isMe = Boolean(currentUserId && p.authorId === currentUserId)
   const firstMedia = p.mediaItems?.[0]?.mediaUrl || p.mediaUrl || "/profile.jpg"
@@ -103,8 +105,8 @@ function mapPostResponseToCard(
   return {
     id: p.id,
     authorId: p.authorId,
-    authorVerified: Boolean(p.authorVerified),
-    authorVerifiedUntil: p.authorVerifiedUntil,
+    authorVerified: isMe ? Boolean(currentUserVerified) : Boolean(p.authorVerified),
+    authorVerifiedUntil: isMe ? currentUserVerifiedUntil : p.authorVerifiedUntil,
     author: {
       username,
       displayName,
@@ -679,7 +681,14 @@ export default function Pages() {
       }
 
       const mapped = items.map((p) =>
-        mapPostResponseToCard(p, user?.id, user?.username, user?.avatarUrl)
+        mapPostResponseToCard(
+          p,
+          user?.id,
+          user?.username,
+          user?.avatarUrl,
+          user?.verified,
+          user?.verifiedUntil
+        )
       )
       setPosts(mapped)
     } catch {
@@ -687,7 +696,7 @@ export default function Pages() {
     } finally {
       setIsLoading(false)
     }
-  }, [isAuthenticated, user?.id, user?.username, user?.avatarUrl])
+  }, [isAuthenticated, user?.id, user?.username, user?.avatarUrl, user?.verified, user?.verifiedUntil])
 
   useEffect(() => {
     loadFeed()
