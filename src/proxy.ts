@@ -19,9 +19,10 @@ function isPublicContentPath(pathname: string): boolean {
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  const userToken =
+  const rawToken =
     request.cookies.get(USER_TOKEN_KEY)?.value ||
     request.cookies.get("snapgram_access_token")?.value
+  const userToken = rawToken && rawToken.trim().length > 0 ? rawToken : null
 
   const isAuthPage = AUTH_PAGES.includes(pathname)
 

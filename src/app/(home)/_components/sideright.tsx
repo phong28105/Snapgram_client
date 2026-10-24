@@ -7,6 +7,7 @@ import { siderightFooterLists } from "@/data"
 import { useAuth } from "@/hooks/use-auth"
 import { useLoginModal } from "@/components/providers/login-modal-provider"
 import { userService } from "@/services/user.service"
+import { feedService } from "@/services/feed.service"
 import { contentService } from "@/services/content.service"
 import type { UserProfileResponse } from "@/types/user.type"
 
@@ -20,46 +21,82 @@ const Sideright = () => {
   useEffect(() => {
     let active = true
 
-    userService
-      .searchUsers("", 0, 10)
-      .then((res) => {
+    const loadSuggestions = async () => {
+      try {
+        let followedIds = new Set<string>()
+
+        if (isAuthenticated) {
+          try {
+            const fRes = await contentService.getFollowing(0, 100)
+            followedIds = new Set((fRes.content || []).map((f) => f.followingId))
+          } catch {
+            // Ignore
+          }
+        }
+
+        let suggestedProfiles: UserProfileResponse[] = []
+
+        if (isAuthenticated) {
+          try {
+            const feedSuggestions = await feedService.getSuggestedUsers(10)
+            if (feedSuggestions && feedSuggestions.length > 0) {
+              const uids = feedSuggestions.map((s) => s.userId).filter((id) => !followedIds.has(id))
+              if (uids.length > 0) {
+                suggestedProfiles = await userService.getUsersBatch(uids)
+              }
+            }
+          } catch {
+            // Fallback to search
+          }
+        }
+
+        if (suggestedProfiles.length === 0) {
+          const searchRes = await userService.searchUsers("", 0, 15)
+          suggestedProfiles = searchRes.content || []
+        }
+
         if (!active) return
-        const filtered = (res.content || []).filter(
+
+        // Loại bỏ chính mình và những người ĐÃ theo dõi khỏi danh sách gợi ý
+        const filtered = suggestedProfiles.filter(
           (item) =>
             item.id !== user?.id &&
-            item.username?.toLowerCase() !== user?.username?.toLowerCase()
+            item.username?.toLowerCase() !== user?.username?.toLowerCase() &&
+            (!item.id || !followedIds.has(item.id))
         )
-        if (filtered.length > 0) {
-          const list = filtered.slice(0, 5)
-          setSuggestions(list)
 
-          // Kiểm tra xem đã follow user nào trong list chưa
-          if (isAuthenticated) {
-            contentService
-              .getFollowing(0, 100)
-              .then((fRes) => {
-                if (!active) return
-                const followedIds = new Set((fRes.content || []).map((f) => f.followingId))
-                const nextMap: Record<string, boolean> = {}
-                list.forEach((s) => {
-                  if (s.id && followedIds.has(s.id)) {
-                    nextMap[s.username] = true
-                  }
-                })
-                setFollowedMap((prev) => ({ ...prev, ...nextMap }))
-              })
-              .catch(() => {})
+        const list = filtered.slice(0, 5)
+        setSuggestions(list)
+
+        const nextMap: Record<string, boolean> = {}
+        list.forEach((s) => {
+          if (s.id && followedIds.has(s.id)) {
+            nextMap[s.username] = true
           }
-        } else {
-          setSuggestions([])
-        }
-      })
-      .catch(() => {
-        setSuggestions([])
-      })
+        })
+        setFollowedMap((prev) => ({ ...prev, ...nextMap }))
+      } catch {
+        if (active) setSuggestions([])
+      }
+    }
+
+    loadSuggestions()
+
+    const handleFollowUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent<{ userId?: string; username?: string; following?: boolean }>
+      if (customEvent.detail?.username && typeof customEvent.detail.following === "boolean") {
+        setFollowedMap((prev) => ({
+          ...prev,
+          [customEvent.detail.username!]: customEvent.detail.following!,
+        }))
+      }
+    }
+
+    window.addEventListener("snapgram:follow-updated", handleFollowUpdated)
 
     return () => {
       active = false
+      window.removeEventListener("snapgram:follow-updated", handleFollowUpdated)
     }
   }, [user?.id, user?.username, isAuthenticated])
 
@@ -95,10 +132,33 @@ const Sideright = () => {
           await contentService.unfollowUser(sug.id)
           toast.success(`Đã hủy theo dõi @${sug.username}`)
         }
-      } catch {
-        // Rollback optimistic update on error
-        setFollowedMap((prev) => ({ ...prev, [sug.username]: currentFollowing }))
-        toast.error("Không thể cập nhật theo dõi.")
+
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("snapgram:follow-updated", {
+              detail: { userId: sug.id, username: sug.username, following: nextState },
+            })
+          )
+        }
+      } catch (err: any) {
+        // Nếu lỗi 409 (đã theo dõi từ trước), giữ nguyên trạng thái đang theo dõi
+        const status = err?.response?.status
+        const msg = err?.response?.data?.message || err?.message || ""
+        if (nextState && (status === 409 || msg.includes("Already following"))) {
+          setFollowedMap((prev) => ({ ...prev, [sug.username]: true }))
+          toast.success(`Đang theo dõi @${sug.username}`)
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("snapgram:follow-updated", {
+                detail: { userId: sug.id, username: sug.username, following: true },
+              })
+            )
+          }
+        } else {
+          // Rollback optimistic update on real error
+          setFollowedMap((prev) => ({ ...prev, [sug.username]: currentFollowing }))
+          toast.error("Không thể cập nhật theo dõi.")
+        }
       }
     } else {
       if (nextState) {

@@ -51,7 +51,8 @@ import type { CollectionResponse, PostResponse } from "@/types/content.type"
 
 interface PostGridItem {
   id: string
-  image: string
+  image?: string
+  videoUrl?: string
   likes: number
   comments: number
   contentType?: string
@@ -256,25 +257,42 @@ export default function ProfilePage() {
     "Nhiếp ảnh · Phong cách sống · Sáng tạo nội dung 📸✨\nKhám phá những khoảnh khắc đẹp trong cuộc sống hàng ngày."
   const website = profile?.website
 
-  const realPostGridItems: PostGridItem[] = myPosts.map((p) => ({
-    id: p.id,
-    image: p.mediaItems?.[0]?.thumbnailUrl || p.mediaItems?.[0]?.mediaUrl || p.mediaUrl || "/profile.jpg",
-    likes: p.likeCount ?? 0,
-    comments: p.commentCount ?? 0,
-    contentType: p.contentType || (p.mediaItems && p.mediaItems.length > 1 ? "CAROUSEL" : "POST"),
-    mediaCount: p.mediaItems?.length || 1,
-    isRealPost: true,
-  }))
+  const realPostGridItems: PostGridItem[] = myPosts.map((p) => {
+    const firstMedia = p.mediaItems?.[0]
+    const isVideo =
+      p.contentType === "REEL" ||
+      p.contentType === "VIDEO" ||
+      firstMedia?.mediaType?.startsWith("video/") ||
+      /\.(mp4|webm|mov)$/i.test(firstMedia?.mediaUrl || p.mediaUrl || "")
+    const thumb = firstMedia?.thumbnailUrl
+    const media = firstMedia?.mediaUrl || p.mediaUrl || ""
 
-  const realMediaGridItems: PostGridItem[] = myMedia.map((m) => ({
-    id: m.id,
-    image: m.thumbnailUrl || m.url || "/profile.jpg",
-    likes: 0,
-    comments: 0,
-    contentType: m.mimeType?.startsWith("video/") ? "VIDEO" : "POST",
-    mediaCount: 1,
-    isRealMedia: true,
-  }))
+    return {
+      id: p.id,
+      image: thumb && !/\.(mp4|webm|mov)$/i.test(thumb) ? thumb : !isVideo ? (media || "/profile.jpg") : undefined,
+      videoUrl: isVideo ? media : undefined,
+      likes: p.likeCount ?? 0,
+      comments: p.commentCount ?? 0,
+      contentType: p.contentType || (p.mediaItems && p.mediaItems.length > 1 ? "CAROUSEL" : isVideo ? "VIDEO" : "POST"),
+      mediaCount: p.mediaItems?.length || 1,
+      isRealPost: true,
+    }
+  })
+
+  const realMediaGridItems: PostGridItem[] = myMedia.map((m) => {
+    const isVideo = m.mimeType?.startsWith("video/") || /\.(mp4|webm|mov)$/i.test(m.url || "")
+    const thumb = m.thumbnailUrl
+    return {
+      id: m.id,
+      image: thumb && !/\.(mp4|webm|mov)$/i.test(thumb) ? thumb : !isVideo ? (m.url || "/profile.jpg") : undefined,
+      videoUrl: isVideo ? m.url : undefined,
+      likes: 0,
+      comments: 0,
+      contentType: isVideo ? "VIDEO" : "POST",
+      mediaCount: 1,
+      isRealMedia: true,
+    }
+  })
 
   const combinedMyItems =
     realPostGridItems.length > 0
@@ -283,21 +301,26 @@ export default function ProfilePage() {
       ? realMediaGridItems
       : []
 
-  const savedGridItems: PostGridItem[] =
-    savedPosts.length > 0
-      ? savedPosts.map((p) => ({
-          id: p.id,
-          image:
-            p.mediaItems?.[0]?.thumbnailUrl ||
-            p.mediaItems?.[0]?.mediaUrl ||
-            p.mediaUrl ||
-            "/profile.jpg",
-          likes: p.likeCount ?? 0,
-          comments: p.commentCount ?? 0,
-          contentType: p.contentType || (p.mediaItems && p.mediaItems.length > 1 ? "CAROUSEL" : "POST"),
-          mediaCount: p.mediaItems?.length || 1,
-        }))
-      : []
+  const savedGridItems: PostGridItem[] = savedPosts.map((p) => {
+    const firstMedia = p.mediaItems?.[0]
+    const isVideo =
+      p.contentType === "REEL" ||
+      p.contentType === "VIDEO" ||
+      firstMedia?.mediaType?.startsWith("video/") ||
+      /\.(mp4|webm|mov)$/i.test(firstMedia?.mediaUrl || p.mediaUrl || "")
+    const thumb = firstMedia?.thumbnailUrl
+    const media = firstMedia?.mediaUrl || p.mediaUrl || ""
+
+    return {
+      id: p.id,
+      image: thumb && !/\.(mp4|webm|mov)$/i.test(thumb) ? thumb : !isVideo ? (media || "/profile.jpg") : undefined,
+      videoUrl: isVideo ? media : undefined,
+      likes: p.likeCount ?? 0,
+      comments: p.commentCount ?? 0,
+      contentType: p.contentType || (p.mediaItems && p.mediaItems.length > 1 ? "CAROUSEL" : isVideo ? "VIDEO" : "POST"),
+      mediaCount: p.mediaItems?.length || 1,
+    }
+  })
 
   const displayedGridItems =
     activeTab === "reels"
@@ -635,11 +658,27 @@ export default function ProfilePage() {
                     className="relative aspect-square group bg-muted overflow-hidden select-none"
                   >
                     <Link href={`/p/${post.id}`} scroll={false} className="block w-full h-full">
-                      <img
-                        src={post.image}
-                        alt={post.id}
-                        className="w-full h-full object-cover transition duration-300 group-hover:scale-105"
-                      />
+                      {post.videoUrl && !post.image ? (
+                        <video
+                          src={post.videoUrl}
+                          preload="metadata"
+                          className="w-full h-full object-cover pointer-events-none transition duration-300 group-hover:scale-105"
+                          muted
+                          playsInline
+                        />
+                      ) : (
+                        <img
+                          src={post.image || "/profile.jpg"}
+                          alt={post.id}
+                          className="w-full h-full object-cover transition duration-300 group-hover:scale-105"
+                          onError={(e) => {
+                            const target = e.currentTarget as HTMLImageElement
+                            if (target.src !== "/profile.jpg") {
+                              target.src = "/profile.jpg"
+                            }
+                          }}
+                        />
+                      )}
                       {((post.mediaCount && post.mediaCount > 1) || post.contentType === "CAROUSEL") ? (
                         <div className="absolute top-2.5 right-2.5 text-white drop-shadow-md pointer-events-none z-10">
                           <Layers className="w-4 h-4" />

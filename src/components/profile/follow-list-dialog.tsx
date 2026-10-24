@@ -48,12 +48,12 @@ export function FollowListDialog({
         : contentService.getFollowing(0, 30, userId)
 
     fetcher
-      .then((res) => {
+      .then(async (res) => {
         if (!active) return
         const list = res.content || []
         setItems(list)
 
-        // Tải thông tin profile của từng user trong danh sách
+        // Batch tải thông tin profile của tất cả user trong danh sách bằng POST /api/users/batch
         const targetIds = Array.from(
           new Set(
             list.map((item) =>
@@ -62,16 +62,20 @@ export function FollowListDialog({
           )
         )
 
-        targetIds.forEach((uid) => {
-          userService
-            .getPublicProfile(uid)
-            .then((prof) => {
-              if (active) {
-                setUserMap((prev) => ({ ...prev, [uid]: prof }))
-              }
-            })
-            .catch(() => {})
-        })
+        if (targetIds.length > 0) {
+          try {
+            const profiles = await userService.getUsersBatch(targetIds)
+            if (active) {
+              const map: Record<string, UserProfileResponse> = {}
+              profiles.forEach((prof) => {
+                map[prof.id] = prof
+              })
+              setUserMap((prev) => ({ ...prev, ...map }))
+            }
+          } catch {
+            // Ignore batch load error
+          }
+        }
       })
       .catch(() => {
         if (!active) return

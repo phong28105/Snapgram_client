@@ -5,9 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import React from "react";
 import { NotificationsSheet } from "@/components/notifications/notifications-sheet";
+import { useNotifications } from "@/hooks/use-notifications";
 
 const Navbar = () => {
   const router = useRouter();
+  const { unreadCount } = useNotifications();
   const [isInputActive, setIsInputActive] = React.useState<boolean>(false);
   const [query, setQuery] = React.useState<string>("");
 
@@ -57,8 +59,11 @@ const Navbar = () => {
           </form>
 
           <NotificationsSheet>
-            <button type="button" aria-label="Thông báo">
+            <button type="button" aria-label="Thông báo" className="relative p-1">
               <Heart className="w-6 h-6" />
+              {unreadCount > 0 && (
+                <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-background" />
+              )}
             </button>
           </NotificationsSheet>
         </div>

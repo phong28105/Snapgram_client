@@ -2,6 +2,7 @@
 
 import React, { use, useCallback, useEffect, useState } from "react"
 import Link from "next/link"
+import { notFound } from "next/navigation"
 import {
   Ban,
   Camera,
@@ -38,6 +39,7 @@ import { AvatarActionsDialog } from "@/components/profile/avatar-actions-dialog"
 import { ReportDialog } from "@/components/content/report-dialog"
 import { FollowListDialog } from "@/components/profile/follow-list-dialog"
 import { HighlightViewer } from "@/components/content/highlight-viewer"
+import { ProfileSkeleton } from "@/components/profile/profile-skeleton"
 import { userService } from "@/services/user.service"
 import { contentService } from "@/services/content.service"
 import { getErrorMessage } from "@/lib/api"
@@ -46,7 +48,8 @@ import type { HighlightResponse } from "@/types/content.type"
 
 interface PublicPostItem {
   id: string
-  image: string
+  image?: string
+  videoUrl?: string
   likes: number
   comments: number
   contentType?: string
@@ -71,6 +74,7 @@ export default function PublicUserProfilePage({
   const [followersCount, setFollowersCount] = useState(0)
   const [followingCount, setFollowingCount] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
+  const [isNotFound, setIsNotFound] = useState(false)
   const [followStatus, setFollowStatus] = useState<"NONE" | "FOLLOWING" | "PENDING">("NONE")
   const [isFollowSubmitting, setIsFollowSubmitting] = useState(false)
   const [isBlocked, setIsBlocked] = useState(false)
@@ -93,7 +97,15 @@ export default function PublicUserProfilePage({
     setIsLoading(true)
     try {
       const data = await userService.getPublicProfile(usernameParam)
+      if (!data || !data.id) {
+        setIsNotFound(true)
+        return
+      }
       setProfile(data)
+
+      if (data.username && usernameParam.toLowerCase() !== data.username.toLowerCase()) {
+        window.history.replaceState(null, "", `/u/${data.username}`)
+      }
 
       if (data.id) {
         // Lấy ghi chú 24h nếu có
@@ -114,18 +126,26 @@ export default function PublicUserProfilePage({
           .then((page) => {
             const items = page.content || []
             setUserPosts(
-              items.map((p) => ({
-                id: p.id,
-                image:
-                  p.mediaItems?.[0]?.thumbnailUrl ||
-                  p.mediaItems?.[0]?.mediaUrl ||
-                  p.mediaUrl ||
-                  "/profile.jpg",
-                likes: p.likeCount ?? 0,
-                comments: p.commentCount ?? 0,
-                contentType: p.contentType || (p.mediaItems && p.mediaItems.length > 1 ? "CAROUSEL" : "POST"),
-                mediaCount: p.mediaItems?.length || 1,
-              }))
+              items.map((p) => {
+                const firstMedia = p.mediaItems?.[0]
+                const isVideo =
+                  p.contentType === "REEL" ||
+                  p.contentType === "VIDEO" ||
+                  firstMedia?.mediaType?.startsWith("video/") ||
+                  /\.(mp4|webm|mov)$/i.test(firstMedia?.mediaUrl || p.mediaUrl || "")
+                const thumb = firstMedia?.thumbnailUrl
+                const media = firstMedia?.mediaUrl || p.mediaUrl || ""
+
+                return {
+                  id: p.id,
+                  image: thumb && !/\.(mp4|webm|mov)$/i.test(thumb) ? thumb : !isVideo ? (media || "/profile.jpg") : undefined,
+                  videoUrl: isVideo ? media : undefined,
+                  likes: p.likeCount ?? 0,
+                  comments: p.commentCount ?? 0,
+                  contentType: p.contentType || (p.mediaItems && p.mediaItems.length > 1 ? "CAROUSEL" : isVideo ? "VIDEO" : "POST"),
+                  mediaCount: p.mediaItems?.length || 1,
+                }
+              })
             )
             setTotalPosts(typeof page.totalElements === "number" ? page.totalElements : items.length)
           })
@@ -153,7 +173,10 @@ export default function PublicUserProfilePage({
             .getBlockedUsers(0, 50)
             .then((res) => {
               const blocked = (res.content || []).some((b) => b.userId === data.id)
-              if (blocked) setIsBlocked(true)
+              if (blocked) {
+                setIsBlocked(true)
+                setIsNotFound(true)
+              }
             })
             .catch(() => {})
         }
@@ -169,15 +192,7 @@ export default function PublicUserProfilePage({
           .catch(() => {})
       }
     } catch {
-      setProfile({
-        id: "",
-        username: usernameParam,
-        displayName: usernameParam,
-        avatarUrl: "/profile.jpg",
-        bio: "Thành viên cộng đồng Snapgram 📸",
-      })
-      setUserPosts([])
-      setTotalPosts(0)
+      setIsNotFound(true)
     } finally {
       setIsLoading(false)
     }
@@ -185,7 +200,27 @@ export default function PublicUserProfilePage({
 
   useEffect(() => {
     loadUser()
-  }, [loadUser])
+
+    const handleFollowUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent<{ userId?: string; username?: string; following?: boolean }>
+      if (
+        (profile?.id && customEvent.detail?.userId === profile.id) ||
+        (profile?.username && customEvent.detail?.username?.toLowerCase() === profile.username.toLowerCase())
+      ) {
+        if (typeof customEvent.detail.following === "boolean") {
+          setFollowStatus(customEvent.detail.following ? "FOLLOWING" : "NONE")
+          setFollowersCount((prev) =>
+            customEvent.detail.following ? prev + 1 : Math.max(0, prev - 1)
+          )
+        }
+      }
+    }
+
+    window.addEventListener("snapgram:follow-updated", handleFollowUpdated)
+    return () => {
+      window.removeEventListener("snapgram:follow-updated", handleFollowUpdated)
+    }
+  }, [loadUser, profile?.id, profile?.username])
 
   const requireAuth = (action: () => void) => {
     if (!isAuthenticated) {
@@ -217,14 +252,42 @@ export default function PublicUserProfilePage({
             setFollowersCount((prev) => prev + 1)
             toast.success(`Đã theo dõi @${profile.username}`)
           }
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("snapgram:follow-updated", {
+                detail: { userId: profile.id, username: profile.username, following: true },
+              })
+            )
+          }
         } else {
           await contentService.unfollowUser(profile.id)
           setFollowStatus("NONE")
           setFollowersCount((prev) => Math.max(0, prev - 1))
           toast.success(`Đã hủy theo dõi @${profile.username}`)
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("snapgram:follow-updated", {
+                detail: { userId: profile.id, username: profile.username, following: false },
+              })
+            )
+          }
         }
-      } catch (err) {
-        toast.error(getErrorMessage(err, "Không thể cập nhật theo dõi."))
+      } catch (err: any) {
+        const status = err?.response?.status
+        const msg = err?.response?.data?.message || err?.message || ""
+        if (followStatus === "NONE" && (status === 409 || msg.includes("Already following"))) {
+          setFollowStatus("FOLLOWING")
+          toast.success(`Đang theo dõi @${profile.username}`)
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("snapgram:follow-updated", {
+                detail: { userId: profile.id, username: profile.username, following: true },
+              })
+            )
+          }
+        } else {
+          toast.error(getErrorMessage(err, "Không thể cập nhật theo dõi."))
+        }
       } finally {
         setIsFollowSubmitting(false)
       }
@@ -245,6 +308,7 @@ export default function PublicUserProfilePage({
           setIsBlocked(true)
           setFollowStatus("NONE")
           toast.success(`Đã chặn @${profile.username}`)
+          setIsNotFound(true)
         }
       } catch (err) {
         toast.error(getErrorMessage(err, "Không thể thực hiện thao tác chặn."))
@@ -280,6 +344,14 @@ export default function PublicUserProfilePage({
     }
   }
 
+  if (isNotFound) {
+    notFound()
+  }
+
+  if (isLoading) {
+    return <ProfileSkeleton />
+  }
+
   return (
     <div className="min-h-screen flex bg-background">
       <Sidebar />
@@ -287,13 +359,8 @@ export default function PublicUserProfilePage({
       <div className="flex-1 flex flex-col min-w-0 max-w-5xl mx-auto pb-12">
         <Navbar />
 
-        {isLoading ? (
-          <div className="flex-1 flex items-center justify-center py-20">
-            <Loader2 className="w-7 h-7 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <div className="px-4 md:px-12 pt-6 md:pt-10 max-w-4xl w-full mx-auto space-y-8">
-            {/* Profile Header */}
+        <div className="px-4 md:px-12 pt-6 md:pt-10 max-w-4xl w-full mx-auto space-y-8">
+          {/* Profile Header */}
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 sm:gap-12">
               {/* Avatar + Note */}
               <div className="relative shrink-0 pt-3">
@@ -561,11 +628,27 @@ export default function PublicUserProfilePage({
                       scroll={false}
                       className="relative aspect-square group bg-muted overflow-hidden select-none"
                     >
-                      <img
-                        src={post.image}
-                        alt={post.id}
-                        className="w-full h-full object-cover transition duration-300 group-hover:scale-105"
-                      />
+                      {post.videoUrl && !post.image ? (
+                        <video
+                          src={post.videoUrl}
+                          preload="metadata"
+                          className="w-full h-full object-cover pointer-events-none transition duration-300 group-hover:scale-105"
+                          muted
+                          playsInline
+                        />
+                      ) : (
+                        <img
+                          src={post.image || "/profile.jpg"}
+                          alt={post.id}
+                          className="w-full h-full object-cover transition duration-300 group-hover:scale-105"
+                          onError={(e) => {
+                            const target = e.currentTarget as HTMLImageElement
+                            if (target.src !== "/profile.jpg") {
+                              target.src = "/profile.jpg"
+                            }
+                          }}
+                        />
+                      )}
                       {((post.mediaCount && post.mediaCount > 1) || post.contentType === "CAROUSEL") ? (
                         <div className="absolute top-2.5 right-2.5 text-white drop-shadow-md pointer-events-none z-10">
                           <Layers className="w-4 h-4" />
@@ -591,7 +674,6 @@ export default function PublicUserProfilePage({
               )}
             </div>
           </div>
-        )}
 
         <Navbot />
       </div>

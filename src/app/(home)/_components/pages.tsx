@@ -54,6 +54,7 @@ interface PostProps {
   authorId?: string
   author: {
     username: string
+    displayName?: string
     avatar: string
   }
   image: string
@@ -72,6 +73,7 @@ interface PostProps {
   commentCount?: number
   createdAt: string
   isReal?: boolean
+  recommendationReason?: string
 }
 
 function mapPostResponseToCard(
@@ -82,14 +84,23 @@ function mapPostResponseToCard(
 ): PostProps {
   const isMe = Boolean(currentUserId && p.authorId === currentUserId)
   const firstMedia = p.mediaItems?.[0]?.mediaUrl || p.mediaUrl || "/profile.jpg"
+  const username = isMe
+    ? currentUsername || "me"
+    : p.authorUsername || p.authorId || "snapgram_user"
+  const displayName = isMe
+    ? currentUsername
+    : p.authorDisplayName || p.authorUsername || username
+  const avatar = isMe && currentAvatar
+    ? currentAvatar
+    : p.authorAvatarUrl || "/profile.jpg"
+
   return {
     id: p.id,
     authorId: p.authorId,
     author: {
-      username: isMe
-        ? currentUsername || "me"
-        : `user_${(p.authorId || "snap").slice(0, 6)}`,
-      avatar: isMe && currentAvatar ? currentAvatar : "/profile.jpg",
+      username,
+      displayName,
+      avatar,
     },
     image: firstMedia,
     mediaItems: p.mediaItems && p.mediaItems.length > 0 ? p.mediaItems : [{ mediaUrl: firstMedia }],
@@ -102,6 +113,7 @@ function mapPostResponseToCard(
     commentCount: p.commentCount ?? 0,
     createdAt: p.createdAt || new Date().toISOString(),
     isReal: true,
+    recommendationReason: p.recommendationReason,
   }
 }
 
@@ -339,6 +351,14 @@ function PostCard({
             </Link>
             <span className="text-muted-foreground">•</span>
             <TimeAgo date={post.createdAt} className="text-muted-foreground" />
+            {post.recommendationReason && (
+              <>
+                <span className="text-muted-foreground">•</span>
+                <span className="text-[10px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-full font-normal">
+                  {post.recommendationReason}
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -609,14 +629,24 @@ export default function Pages() {
   const loadFeed = useCallback(async () => {
     setIsLoading(true)
     try {
-      const feedRes = isAuthenticated
-        ? await contentService.getFeedPosts(0, 20)
-        : await contentService.getExplorePosts(0, 20)
+      let items: PostResponse[] = []
 
-      let items = feedRes.content || []
+      if (isAuthenticated) {
+        try {
+          const feedRes = await contentService.getFeedPosts(0, 20)
+          items = feedRes.content || []
+        } catch {
+          items = []
+        }
+      }
+
       if (items.length === 0) {
-        const exploreRes = await contentService.getExplorePosts(0, 20)
-        items = exploreRes.content || []
+        try {
+          const exploreRes = await contentService.getExplorePosts(0, 20)
+          items = exploreRes.content || []
+        } catch {
+          items = []
+        }
       }
 
       const mapped = items.map((p) =>
@@ -638,9 +668,17 @@ export default function Pages() {
     const handlePostCreated = () => {
       loadFeed()
     }
+    const handleFollowUpdated = () => {
+      loadFeed()
+    }
+
     window.addEventListener("snapgram:post-created", handlePostCreated)
-    return () =>
+    window.addEventListener("snapgram:follow-updated", handleFollowUpdated)
+
+    return () => {
       window.removeEventListener("snapgram:post-created", handlePostCreated)
+      window.removeEventListener("snapgram:follow-updated", handleFollowUpdated)
+    }
   }, [loadFeed])
 
   const handlePostUpdated = (id: string, updated: PostResponse) => {

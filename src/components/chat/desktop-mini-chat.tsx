@@ -182,7 +182,7 @@ export function DesktopMiniChat() {
   if (!isAuthenticated) return null
 
   return (
-    <div className="hidden md:block fixed bottom-4 left-6 z-40">
+    <div className="hidden md:block fixed bottom-4 right-6 z-40">
       {!isOpen ? (
         /* Collapsed Floating Pill Launcher */
         <button

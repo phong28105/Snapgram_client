@@ -27,6 +27,7 @@ import type { HashtagResponse, PostResponse } from "@/types/content.type"
 interface ExploreTile {
   id: string
   image: string
+  videoUrl?: string
   likes: number
   comments: number
   category: string
@@ -48,15 +49,26 @@ const categories = [
 const RECENT_SEARCH_STORAGE_KEY = "snapgram_recent_searches"
 
 function mapPostToTile(p: PostResponse, idx: number): ExploreTile {
+  const firstMedia = p.mediaItems?.[0]
+  const rawMediaUrl = firstMedia?.mediaUrl || p.mediaUrl || ""
+  const isVideoMedia =
+    firstMedia?.mediaType === "VIDEO" ||
+    p.contentType === "REEL" ||
+    p.contentType === "VIDEO" ||
+    /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(rawMediaUrl)
+
+  // thumbnailUrl may wrongly point at the video file itself -> treat as missing
+  const rawThumb = firstMedia?.thumbnailUrl
+  const hasRealThumb = Boolean(
+    rawThumb && rawThumb !== rawMediaUrl && !/\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(rawThumb)
+  )
+
   const isReel = p.contentType === "REEL"
   const isCarousel = p.contentType === "CAROUSEL" || (Boolean(p.mediaItems) && (p.mediaItems?.length ?? 0) > 1)
   return {
     id: p.id,
-    image:
-      p.mediaItems?.[0]?.thumbnailUrl ||
-      p.mediaItems?.[0]?.mediaUrl ||
-      p.mediaUrl ||
-      "/profile.jpg",
+    image: hasRealThumb ? (rawThumb as string) : "",
+    videoUrl: isVideoMedia ? rawMediaUrl : undefined,
     likes: p.likeCount ?? 0,
     comments: p.commentCount ?? 0,
     category: "Dành cho bạn",
@@ -482,11 +494,33 @@ function ExploreContent() {
                 item.span || ""
               }`}
             >
-              <img
-                src={item.image}
-                alt={item.id}
-                className="w-full h-full object-cover transition duration-300 group-hover:scale-105"
-              />
+              {item.videoUrl ? (
+                <video
+                  src={item.videoUrl}
+                  poster={item.image || undefined}
+                  muted
+                  loop
+                  playsInline
+                  preload="metadata"
+                  className="w-full h-full object-cover transition duration-300 group-hover:scale-105 pointer-events-none"
+                  onMouseEnter={(e) => {
+                    const v = e.currentTarget
+                    v.play().catch(() => {})
+                  }}
+                  onMouseLeave={(e) => {
+                    const v = e.currentTarget
+                    v.pause()
+                  }}
+                />
+              ) : item.image ? (
+                <img
+                  src={item.image}
+                  alt={item.id}
+                  className="w-full h-full object-cover transition duration-300 group-hover:scale-105"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-muted to-muted-foreground/20" />
+              )}
 
               {item.isReel ? (
                 <div className="absolute top-2.5 right-2.5 z-10 text-white drop-shadow-md">

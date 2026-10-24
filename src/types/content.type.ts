@@ -65,6 +65,9 @@ export interface UpdatePostRequest {
 export interface PostResponse {
   id: string;
   authorId: string;
+  authorUsername?: string;
+  authorDisplayName?: string;
+  authorAvatarUrl?: string;
   contentType?: PostContentType;
   caption?: string;
   mediaId?: string;
@@ -83,6 +86,7 @@ export interface PostResponse {
   hashtags?: string[];
   mentionedUserIds?: string[];
   likedByMe?: boolean;
+  recommendationReason?: string;
 }
 
 export interface PagePostResponse {
@@ -124,6 +128,9 @@ export interface CommentResponse {
   id: string;
   postId: string;
   authorId: string;
+  authorUsername?: string;
+  authorDisplayName?: string;
+  authorAvatarUrl?: string;
   content: string;
   parentCommentId?: string;
   likeCount?: number;
@@ -161,6 +168,9 @@ export interface CreateStoryRequest {
 export interface StoryResponse {
   id: string;
   authorId: string;
+  authorUsername?: string;
+  authorDisplayName?: string;
+  authorAvatarUrl?: string;
   mediaId?: string;
   mediaUrl: string;
   mediaType?: string;

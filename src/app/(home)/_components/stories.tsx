@@ -24,10 +24,12 @@ import { Input } from "@/components/ui/input"
 import { useAuth } from "@/hooks/use-auth"
 import { useLoginModal } from "@/components/providers/login-modal-provider"
 import { contentService } from "@/services/content.service"
+import { userService } from "@/services/user.service"
 import { mediaService } from "@/services/media.service"
 import { getErrorMessage } from "@/lib/api"
 import { toast } from "sonner"
 import type { ContentVisibility, StoryViewerResponse } from "@/types/content.type"
+import type { UserProfileResponse } from "@/types/user.type"
 
 interface StoryItem {
   id: string
@@ -70,6 +72,7 @@ export default function Stories() {
   // Story Viewers Modal State
   const [isViewersOpen, setIsViewersOpen] = useState(false)
   const [viewers, setViewers] = useState<StoryViewerResponse[]>([])
+  const [viewerProfileMap, setViewerProfileMap] = useState<Record<string, UserProfileResponse>>({})
   const [isLoadingViewers, setIsLoadingViewers] = useState(false)
 
   const loadStoryFeed = useCallback(async () => {
@@ -82,11 +85,11 @@ export default function Stories() {
           username:
             s.authorId === user?.id
               ? user?.username || "Tin của bạn"
-              : `user_${s.authorId.slice(0, 6)}`,
+              : s.authorUsername || s.authorId || "Người dùng",
           avatar:
             s.authorId === user?.id && user?.avatarUrl
               ? user.avatarUrl
-              : "/profile.jpg",
+              : s.authorAvatarUrl || "/profile.jpg",
           media: s.mediaUrl || "/auth-image-1.webp",
           mediaType: s.mediaType,
           caption: s.caption,
@@ -267,7 +270,22 @@ export default function Stories() {
     setIsLoadingViewers(true)
     try {
       const res = await contentService.getStoryViewers(storyId, 0, 30)
-      setViewers(res.content || [])
+      const list = res.content || []
+      setViewers(list)
+
+      const viewerIds = Array.from(new Set(list.map((v) => v.viewerId).filter(Boolean)))
+      if (viewerIds.length > 0) {
+        try {
+          const profiles = await userService.getUsersBatch(viewerIds)
+          const pMap: Record<string, UserProfileResponse> = {}
+          profiles.forEach((p) => {
+            pMap[p.id] = p
+          })
+          setViewerProfileMap((prev) => ({ ...prev, ...pMap }))
+        } catch {
+          // Ignore
+        }
+      }
     } catch {
       setViewers([])
     } finally {
@@ -633,21 +651,38 @@ export default function Stories() {
                 Chưa có người xem nào.
               </p>
             ) : (
-              viewers.map((v) => (
-                <div
-                  key={v.viewerId}
-                  className="flex items-center justify-between py-2.5 text-xs"
-                >
-                  <span className="font-semibold">
-                    user_{v.viewerId.slice(0, 8)}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {v.viewedAt
-                      ? new Date(v.viewedAt).toLocaleTimeString("vi-VN")
-                      : "Đã xem"}
-                  </span>
-                </div>
-              ))
+              viewers.map((v) => {
+                const prof = viewerProfileMap[v.viewerId]
+                const username = prof?.username || `user_${v.viewerId.slice(0, 6)}`
+                const avatar = prof?.avatarUrl || "/profile.jpg"
+                const displayName = prof?.displayName || username
+
+                return (
+                  <div
+                    key={v.viewerId}
+                    className="flex items-center justify-between py-2.5 text-xs"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <img
+                        src={avatar}
+                        alt={username}
+                        className="w-7 h-7 rounded-full object-cover border border-border shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <p className="font-semibold truncate">{username}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">
+                          {displayName}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground shrink-0">
+                      {v.viewedAt
+                        ? new Date(v.viewedAt).toLocaleTimeString("vi-VN")
+                        : "Đã xem"}
+                    </span>
+                  </div>
+                )
+              })
             )}
           </div>
         </DialogContent>

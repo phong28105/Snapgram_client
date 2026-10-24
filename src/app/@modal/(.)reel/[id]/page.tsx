@@ -129,13 +129,11 @@ export default function ReelModal({
   const authorName =
     postData?.authorId && user?.id === postData.authorId
       ? user.username
-      : postData?.authorId
-      ? `user_${postData.authorId.slice(0, 6)}`
-      : "street_vibes"
+      : postData?.authorUsername || postData?.authorId || "street_vibes"
   const authorAvatar =
     postData?.authorId && user?.id === postData.authorId && user.avatarUrl
       ? user.avatarUrl
-      : "/profile.jpg"
+      : postData?.authorAvatarUrl || "/profile.jpg"
   const mediaUrl =
     postData?.mediaItems?.[0]?.mediaUrl ||
     postData?.mediaUrl ||

@@ -59,8 +59,10 @@ function mapCommentDto(
     authorId: c.authorId,
     username: isMe
       ? currentUsername || "me"
-      : `user_${(c.authorId || "user").slice(0, 6)}`,
-    avatar: isMe && currentAvatar ? currentAvatar : "/profile.jpg",
+      : c.authorUsername || c.authorId || "snapgram_user",
+    avatar: isMe && currentAvatar
+      ? currentAvatar
+      : c.authorAvatarUrl || "/profile.jpg",
     text: c.content,
     createdAt: c.createdAt || new Date().toISOString(),
     likeCount: c.likeCount ?? 0,
@@ -348,13 +350,11 @@ export default function PostPage({
   const authorUsername =
     postData?.authorId && user?.id === postData.authorId
       ? user.username
-      : postData?.authorId
-      ? `user_${postData.authorId.slice(0, 6)}`
-      : "snapgram_official"
+      : postData?.authorUsername || postData?.authorId || "snapgram_official"
   const authorAvatar =
     postData?.authorId && user?.id === postData.authorId && user.avatarUrl
       ? user.avatarUrl
-      : "/profile.jpg"
+      : postData?.authorAvatarUrl || "/profile.jpg"
   const postMediaUrl =
     postData?.mediaItems?.[0]?.mediaUrl || postData?.mediaUrl || "/profile.jpg"
   const postCaption =

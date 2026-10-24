@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useCallback, useEffect, useState } from "react"
+import React, { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import {
   Bookmark,
@@ -33,6 +33,7 @@ interface ReelItem {
   caption: string
   audio: string
   videoThumbnail: string
+  videoUrl: string
   initialLikes: number
   commentsCount: number
   isReal?: boolean
@@ -47,10 +48,16 @@ function mapPostToReelItem(
   const isMe = Boolean(currentUserId && p.authorId === currentUserId)
   const username = isMe
     ? currentUsername || "me"
-    : `user_${(p.authorId || "snap").slice(0, 6)}`
-  const avatar = isMe && currentAvatar ? currentAvatar : "/profile.jpg"
-  const mediaUrl =
-    p.mediaItems?.[0]?.mediaUrl || p.mediaUrl || "/auth-image-1.webp"
+    : p.authorUsername || p.authorId || "snapgram_user"
+  const avatar = isMe && currentAvatar
+    ? currentAvatar
+    : p.authorAvatarUrl || "/profile.jpg"
+  const rawMediaUrl = p.mediaItems?.[0]?.mediaUrl || p.mediaUrl || ""
+  const rawThumb = p.mediaItems?.[0]?.thumbnailUrl
+  const hasRealThumb = Boolean(
+    rawThumb && rawThumb !== rawMediaUrl && !/\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(rawThumb)
+  )
+  const mediaUrl = rawMediaUrl || "/auth-image-1.webp"
 
   return {
     id: p.id,
@@ -60,7 +67,8 @@ function mapPostToReelItem(
     },
     caption: p.caption || "Khoảnh khắc thước phim Snapgram 🎬",
     audio: `Âm thanh gốc - ${username}`,
-    videoThumbnail: mediaUrl,
+    videoThumbnail: hasRealThumb ? (rawThumb as string) : "",
+    videoUrl: mediaUrl,
     initialLikes: p.likeCount ?? 0,
     commentsCount: p.commentCount ?? 0,
     isReal: true,
@@ -107,6 +115,18 @@ export default function ReelsPage() {
   }, [loadReelsFromApi])
 
   const currentReel = reels[currentIndex]
+
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    if (isPlaying) {
+      video.play().catch(() => {})
+    } else {
+      video.pause()
+    }
+  }, [isPlaying, currentReel?.id])
 
   // Gửi VIEW interaction khi chuyển đến reel mới
   useEffect(() => {
@@ -253,9 +273,15 @@ export default function ReelsPage() {
           {/* Reel Video Card */}
           <div className="relative w-[340px] sm:w-[380px] h-[640px] sm:h-[720px] rounded-2xl overflow-hidden bg-black shadow-2xl flex items-center justify-center select-none group">
             {/* Visual Media Background */}
-            <img
-              src={currentReel.videoThumbnail}
-              alt={currentReel.caption}
+            <video
+              key={currentReel.id}
+              ref={videoRef}
+              src={currentReel.videoUrl}
+              poster={currentReel.videoThumbnail || undefined}
+              loop
+              muted={isMuted}
+              playsInline
+              preload="metadata"
               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-102"
               onClick={() => setIsPlaying((p) => !p)}
             />
