@@ -42,11 +42,14 @@ import { ReportDialog } from "@/components/content/report-dialog"
 import { toast } from "sonner"
 import type { CollectionResponse, ContentVisibility, PostResponse } from "@/types/content.type"
 import { PostMediaCarousel } from "@/components/content/post-media-carousel"
+import { AuthorBadge } from "@/components/content/author-badge"
 
 interface CommentItem {
   id: string
   username: string
   text: string
+  /** Có khi bình luận đến từ API (dùng để nhận biết bình luận của tác giả bài viết) */
+  authorId?: string
 }
 
 interface PostProps {
@@ -510,12 +513,22 @@ function PostCard({
 
       {/* Top 2 Comments preview */}
       <div className="px-1 space-y-1 mt-1 text-xs">
-        {comments.slice(-2).map((c) => (
-          <div key={c.id} className="leading-tight">
-            <span className="font-semibold mr-1.5">{c.username}</span>
-            <span className="text-foreground/90">{c.text}</span>
-          </div>
-        ))}
+        {comments.slice(-2).map((c) => {
+          // Bình luận của chính tác giả bài viết -> gắn badge "Tác giả"
+          const isByPostAuthor = Boolean(
+            (c.authorId && post.authorId && c.authorId === post.authorId) ||
+              (c.username &&
+                post.author.username &&
+                c.username.toLowerCase() === post.author.username.toLowerCase())
+          )
+          return (
+            <div key={c.id} className="leading-tight">
+              <span className="font-semibold mr-1.5">{c.username}</span>
+              {isByPostAuthor && <AuthorBadge className="mr-1.5" />}
+              <span className="text-foreground/90">{c.text}</span>
+            </div>
+          )
+        })}
       </div>
 
       {/* Inline Comment Input Form */}

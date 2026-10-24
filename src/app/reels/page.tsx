@@ -26,8 +26,10 @@ import { safePoster } from "@/lib/media"
 import { toast } from "sonner"
 import type { PostResponse } from "@/types/content.type"
 
-interface ReelItem {
-  id: string
+/** Số reel tải mỗi lần (lazy load) */
+const REELS_PAGE_SIZE = 6
+
+interface ReelItem {  id: string
   authorId?: string
   author: {
     username: string
@@ -88,6 +90,9 @@ export default function ReelsPage() {
   const [reels, setReels] = useState<ReelItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [isLikedMap, setIsLikedMap] = useState<Record<string, boolean>>({})
   const [likesCountMap, setLikesCountMap] = useState<Record<string, number>>({})
   const [isBookmarkedMap, setIsBookmarkedMap] = useState<Record<string, boolean>>({})
@@ -101,26 +106,20 @@ export default function ReelsPage() {
   const loadReelsFromApi = useCallback(async () => {
     setIsLoading(true)
     try {
-      const res = await contentService.getExplorePosts(0, 30)
+      const res = await contentService.getReels(0, REELS_PAGE_SIZE)
       const items = res.content || []
-      const reelPosts = items.filter((p) => p.contentType === "REEL")
-      const listToUse = reelPosts.length > 0 ? reelPosts : items
-      if (listToUse.length > 0) {
-        const mapped = listToUse.map((p) =>
+      if (items.length > 0) {
+        const mapped = items.map((p) =>
           mapPostToReelItem(p, user?.id, user?.username, user?.avatarUrl)
         )
         setReels(mapped)
+        setPage(0)
+        setHasMore(!res.last && (res.totalPages ?? 1) > 1)
 
         // Khởi tạo state từ dữ liệu server (trước đây luôn reset về false)
-        setIsLikedMap(
-          Object.fromEntries(mapped.map((r) => [r.id, r.likedByMe]))
-        )
-        setLikesCountMap(
-          Object.fromEntries(mapped.map((r) => [r.id, r.initialLikes]))
-        )
-        setIsBookmarkedMap(
-          Object.fromEntries(mapped.map((r) => [r.id, r.savedByMe]))
-        )
+        setIsLikedMap(Object.fromEntries(mapped.map((r) => [r.id, r.likedByMe])))
+        setLikesCountMap(Object.fromEntries(mapped.map((r) => [r.id, r.initialLikes])))
+        setIsBookmarkedMap(Object.fromEntries(mapped.map((r) => [r.id, r.savedByMe])))
         setCommentsCountMap(
           Object.fromEntries(mapped.map((r) => [r.id, r.commentsCount]))
         )
@@ -140,10 +139,11 @@ export default function ReelsPage() {
               }
             })
           )
-          setFollowMap(Object.fromEntries(entries))
+          setFollowMap((prev) => ({ ...prev, ...Object.fromEntries(entries) }))
         }
       } else {
         setReels([])
+        setHasMore(false)
       }
     } catch {
       setReels([])
@@ -151,6 +151,77 @@ export default function ReelsPage() {
       setIsLoading(false)
     }
   }, [user?.id, user?.username, user?.avatarUrl, isAuthenticated])
+
+  /**
+   * Tải thêm reel khi người dùng tới gần cuối danh sách (lazy load).
+   * Mỗi lần chỉ lấy thêm REELS_PAGE_SIZE reel để không chặn UI.
+   */
+  const loadMoreReels = useCallback(async () => {
+    if (isLoadingMore || !hasMore) return
+    setIsLoadingMore(true)
+    const nextPage = page + 1
+    try {
+      const res = await contentService.getReels(nextPage, REELS_PAGE_SIZE)
+      const items = res.content || []
+      if (items.length > 0) {
+        const mapped = items.map((p) =>
+          mapPostToReelItem(p, user?.id, user?.username, user?.avatarUrl)
+        )
+        setReels((prev) => [...prev, ...mapped])
+        setIsLikedMap((prev) => ({
+          ...prev,
+          ...Object.fromEntries(mapped.map((r) => [r.id, r.likedByMe])),
+        }))
+        setLikesCountMap((prev) => ({
+          ...prev,
+          ...Object.fromEntries(mapped.map((r) => [r.id, r.initialLikes])),
+        }))
+        setIsBookmarkedMap((prev) => ({
+          ...prev,
+          ...Object.fromEntries(mapped.map((r) => [r.id, r.savedByMe])),
+        }))
+        setCommentsCountMap((prev) => ({
+          ...prev,
+          ...Object.fromEntries(mapped.map((r) => [r.id, r.commentsCount])),
+        }))
+        setPage(nextPage)
+
+        if (isAuthenticated) {
+          const authorIds = Array.from(
+            new Set(mapped.map((r) => r.authorId).filter(Boolean))
+          ) as string[]
+          const missing = authorIds.filter((id) => !(id in followMap))
+          if (missing.length > 0) {
+            const entries = await Promise.all(
+              missing.map(async (authorId) => {
+                try {
+                  const st = await contentService.getFollowStatus(authorId)
+                  return [authorId, Boolean(st.following)] as const
+                } catch {
+                  return [authorId, false] as const
+                }
+              })
+            )
+            setFollowMap((prev) => ({ ...prev, ...Object.fromEntries(entries) }))
+          }
+        }
+      }
+      setHasMore(!res.last && items.length > 0)
+    } catch {
+      setHasMore(false)
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }, [
+    isLoadingMore,
+    hasMore,
+    page,
+    user?.id,
+    user?.username,
+    user?.avatarUrl,
+    isAuthenticated,
+    followMap,
+  ])
 
   useEffect(() => {
     loadReelsFromApi()
@@ -294,6 +365,13 @@ export default function ReelsPage() {
     }
   }
 
+  // Lazy load: khi còn cách cuối danh sách 2 reel thì tải thêm
+  useEffect(() => {
+    if (!isLoading && hasMore && currentIndex >= reels.length - 2) {
+      loadMoreReels()
+    }
+  }, [currentIndex, reels.length, hasMore, isLoading, loadMoreReels])
+
   // Điều hướng bằng bàn phím (↑/↓ hoặc j/k)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -420,6 +498,19 @@ export default function ReelsPage() {
               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-102"
               onClick={() => setIsPlaying((p) => !p)}
             />
+
+            {/* Preload metadata của reel kế tiếp để chuyển reel mượt hơn */}
+            {reels[currentIndex + 1] && (
+              <video
+                key={`pre-${reels[currentIndex + 1].id}`}
+                src={reels[currentIndex + 1].videoUrl}
+                preload="metadata"
+                muted
+                playsInline
+                className="hidden"
+                aria-hidden
+              />
+            )}
 
             {/* Play/Pause Center Indicator */}
             {!isPlaying && (

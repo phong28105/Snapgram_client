@@ -51,6 +51,17 @@ export const contentService = {
   },
 
   /**
+   * Danh sách Reels công khai (phân trang — dùng cho lazy load)
+   * GET /api/posts/reels
+   */
+  async getReels(page = 0, size = 6): Promise<PagePostResponse> {
+    const response = await apiClient.get<PagePostResponse>("/api/posts/reels", {
+      params: { page, size },
+    });
+    return response.data;
+  },
+
+  /**
    * Feed cá nhân
    * GET /api/posts/feed
    */
