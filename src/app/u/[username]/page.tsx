@@ -45,6 +45,7 @@ import { contentService } from "@/services/content.service"
 import { getErrorMessage } from "@/lib/api"
 import type { NoteResponse, UserProfileResponse } from "@/types/user.type"
 import type { HighlightResponse } from "@/types/content.type"
+import { isVideoMedia, safePoster } from "@/lib/media"
 
 interface PublicPostItem {
   id: string
@@ -128,17 +129,16 @@ export default function PublicUserProfilePage({
             setUserPosts(
               items.map((p) => {
                 const firstMedia = p.mediaItems?.[0]
-                const isVideo =
-                  p.contentType === "REEL" ||
-                  p.contentType === "VIDEO" ||
-                  firstMedia?.mediaType?.startsWith("video/") ||
-                  /\.(mp4|webm|mov)$/i.test(firstMedia?.mediaUrl || p.mediaUrl || "")
-                const thumb = firstMedia?.thumbnailUrl
                 const media = firstMedia?.mediaUrl || p.mediaUrl || ""
+                const isVideo =
+                  isVideoMedia(media, firstMedia?.mediaType) ||
+                  p.contentType === "REEL" ||
+                  p.contentType === "VIDEO"
+                const poster = safePoster(firstMedia?.thumbnailUrl, media)
 
                 return {
                   id: p.id,
-                  image: thumb && !/\.(mp4|webm|mov)$/i.test(thumb) ? thumb : !isVideo ? (media || "/profile.jpg") : undefined,
+                  image: isVideo ? poster : poster || media || "/profile.jpg",
                   videoUrl: isVideo ? media : undefined,
                   likes: p.likeCount ?? 0,
                   comments: p.commentCount ?? 0,
@@ -628,9 +628,10 @@ export default function PublicUserProfilePage({
                       scroll={false}
                       className="relative aspect-square group bg-muted overflow-hidden select-none"
                     >
-                      {post.videoUrl && !post.image ? (
+                      {post.videoUrl ? (
                         <video
                           src={post.videoUrl}
+                          poster={post.image || undefined}
                           preload="metadata"
                           className="w-full h-full object-cover pointer-events-none transition duration-300 group-hover:scale-105"
                           muted

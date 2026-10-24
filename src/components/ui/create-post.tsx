@@ -25,6 +25,7 @@ import { useLoginModal } from "@/components/providers/login-modal-provider"
 import { mediaService } from "@/services/media.service"
 import { contentService } from "@/services/content.service"
 import { getErrorMessage } from "@/lib/api"
+import { isVideoMedia } from "@/lib/media"
 import type { ContentVisibility, PostContentType, PostMediaRequest } from "@/types/content.type"
 
 interface CreatePostProps {
@@ -163,11 +164,13 @@ const CreatePost: React.FC<CreatePostProps> = ({ children }) => {
       for (let i = 0; i < mediaList.length; i++) {
         const item = mediaList[i]
         const mediaRes = await mediaService.upload(item.file)
+        // Backend không sinh poster cho video -> không được fallback về URL file video.
+        const isVideo = isVideoMedia(mediaRes.url, item.isVideo ? "VIDEO" : "IMAGE")
         uploadedRequests.push({
           mediaId: mediaRes.id,
           mediaUrl: mediaRes.url,
-          thumbnailUrl: mediaRes.thumbnailUrl || mediaRes.url,
-          mediaType: item.isVideo ? "VIDEO" : "IMAGE",
+          thumbnailUrl: isVideo ? undefined : mediaRes.thumbnailUrl || undefined,
+          mediaType: isVideo ? "VIDEO" : "IMAGE",
           sortOrder: i,
           width: mediaRes.width,
           height: mediaRes.height,

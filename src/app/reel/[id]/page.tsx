@@ -1,6 +1,6 @@
 "use client"
 
-import React, { use, useCallback, useEffect, useState } from "react"
+import React, { use, useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import {
   Bookmark,
@@ -17,6 +17,7 @@ import SnapgramLogo from "@/components/logo/SnapgramLogo"
 import { useAuth } from "@/hooks/use-auth"
 import { useLoginModal } from "@/components/providers/login-modal-provider"
 import { contentService } from "@/services/content.service"
+import { safePoster } from "@/lib/media"
 import { toast } from "sonner"
 import type { PostResponse } from "@/types/content.type"
 
@@ -38,6 +39,7 @@ export default function ReelPage({
   const [isFollowing, setIsFollowing] = useState(false)
   const [isMuted, setIsMuted] = useState(true)
   const [isPlaying, setIsPlaying] = useState(true)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
 
   const isRealUuid = !reelId.startsWith("reel-") && !reelId.startsWith("post-")
 
@@ -136,6 +138,22 @@ export default function ReelPage({
     postData?.mediaItems?.[0]?.mediaUrl ||
     postData?.mediaUrl ||
     "/auth-image-1.webp"
+  const mediaPoster = safePoster(
+    postData?.mediaItems?.[0]?.thumbnailUrl,
+    mediaUrl
+  )
+
+  // Đồng bộ trạng thái play/pause của state với thẻ <video>
+  useEffect(() => {
+    const el = videoRef.current
+    if (!el) return
+    if (isPlaying) {
+      el.play().catch(() => {})
+    } else {
+      el.pause()
+    }
+  }, [isPlaying, mediaUrl])
+
   const caption =
     postData?.caption ??
     `Nhịp sống về đêm qua ống kính góc rộng (${reelId}) 🌃✨ #snapgram #reels`
@@ -178,9 +196,15 @@ export default function ReelPage({
             className="relative w-[340px] sm:w-[380px] h-[620px] sm:h-[680px] rounded-2xl overflow-hidden bg-black shadow-2xl flex items-center justify-center select-none"
             onDoubleClick={handleToggleLike}
           >
-            <img
+            <video
+              ref={videoRef}
               src={mediaUrl}
-              alt={`Reel ${reelId}`}
+              poster={mediaPoster}
+              autoPlay
+              loop
+              muted={isMuted}
+              playsInline
+              preload="metadata"
               className="w-full h-full object-cover"
               onClick={() => setIsPlaying((p) => !p)}
             />
