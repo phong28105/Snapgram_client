@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "../components/ui/theme-provider";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { LoginModalProvider } from "@/components/providers/login-modal-provider";
+import { NotificationsProvider } from "@/components/providers/notifications-provider";
 import { DesktopMiniChat } from "@/components/chat/desktop-mini-chat";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -31,12 +32,14 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            <LoginModalProvider>
-              {modal}
-              {children}
-              <DesktopMiniChat />
-              <Toaster />
-            </LoginModalProvider>
+            <NotificationsProvider>
+              <LoginModalProvider>
+                {modal}
+                {children}
+                <DesktopMiniChat />
+                <Toaster />
+              </LoginModalProvider>
+            </NotificationsProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>
