@@ -24,13 +24,18 @@ const Sideright = () => {
     const loadSuggestions = async () => {
       try {
         let followedIds = new Set<string>()
+        let blockedIds = new Set<string>()
 
         if (isAuthenticated) {
-          try {
-            const fRes = await contentService.getFollowing(0, 100)
-            followedIds = new Set((fRes.content || []).map((f) => f.followingId))
-          } catch {
-            // Ignore
+          const [fRes, bRes] = await Promise.allSettled([
+            contentService.getFollowing(0, 100),
+            userService.getBlockedUsers(0, 100),
+          ])
+          if (fRes.status === "fulfilled") {
+            followedIds = new Set((fRes.value.content || []).map((f) => f.followingId))
+          }
+          if (bRes.status === "fulfilled") {
+            blockedIds = new Set((bRes.value.content || []).map((b) => b.userId))
           }
         }
 
@@ -40,7 +45,9 @@ const Sideright = () => {
           try {
             const feedSuggestions = await feedService.getSuggestedUsers(10)
             if (feedSuggestions && feedSuggestions.length > 0) {
-              const uids = feedSuggestions.map((s) => s.userId).filter((id) => !followedIds.has(id))
+              const uids = feedSuggestions
+                .map((s) => s.userId)
+                .filter((id) => !followedIds.has(id) && !blockedIds.has(id))
               if (uids.length > 0) {
                 suggestedProfiles = await userService.getUsersBatch(uids)
               }
@@ -57,12 +64,12 @@ const Sideright = () => {
 
         if (!active) return
 
-        // Loại bỏ chính mình, những người ĐÃ theo dõi, và các tài khoản không phải USER khỏi danh sách gợi ý
+        // Loại bỏ chính mình, người ĐÃ theo dõi, người ĐÃ chặn, và tài khoản không phải USER khỏi danh sách gợi ý
         const filtered = suggestedProfiles.filter(
           (item) =>
             item.id !== user?.id &&
             item.username?.toLowerCase() !== user?.username?.toLowerCase() &&
-            (!item.id || !followedIds.has(item.id)) &&
+            (!item.id || (!followedIds.has(item.id) && !blockedIds.has(item.id))) &&
             (!item.role || item.role.toUpperCase() === "USER")
         )
 
@@ -93,11 +100,20 @@ const Sideright = () => {
       }
     }
 
+    const handleBlockUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent<{ userId?: string; username?: string; blocked?: boolean }>
+      if (customEvent.detail?.userId && customEvent.detail.blocked) {
+        setSuggestions((prev) => prev.filter((item) => item.id !== customEvent.detail.userId))
+      }
+    }
+
     window.addEventListener("snapgram:follow-updated", handleFollowUpdated)
+    window.addEventListener("snapgram:block-updated", handleBlockUpdated)
 
     return () => {
       active = false
       window.removeEventListener("snapgram:follow-updated", handleFollowUpdated)
+      window.removeEventListener("snapgram:block-updated", handleBlockUpdated)
     }
   }, [user?.id, user?.username, isAuthenticated])
 

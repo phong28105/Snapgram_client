@@ -96,16 +96,24 @@ export function ConversationList({ activeId, onSelect }: ConversationListProps) 
     )
   }, [activeId])
 
-  // Gợi ý người để nhắn tin: chỉ những người mình ĐÃ FOLLOW.
+  // Gợi ý người để nhắn tin: chỉ những người mình ĐÃ FOLLOW và KHÔNG BỊ CHẶN.
   const loadFollowing = useCallback(async () => {
     if (!user?.id) return
     setIsLoadingFollowing(true)
     try {
-      const page = await contentService.getFollowing(0, 100, user.id)
+      const [fRes, bRes] = await Promise.allSettled([
+        contentService.getFollowing(0, 100, user.id),
+        userService.getBlockedUsers(0, 100),
+      ])
+      const page = fRes.status === "fulfilled" ? fRes.value : { content: [] }
+      const blockedIds = new Set(
+        bRes.status === "fulfilled" ? (bRes.value.content || []).map((b) => b.userId) : []
+      )
+
       const ids = (page.content || [])
         .filter((f) => !f.status || f.status === "ACCEPTED")
         .map((f) => f.followingId)
-        .filter((id): id is string => Boolean(id) && id !== user.id)
+        .filter((id): id is string => Boolean(id) && id !== user.id && !blockedIds.has(id))
       if (ids.length === 0) {
         setFollowing([])
         return
@@ -113,7 +121,7 @@ export function ConversationList({ activeId, onSelect }: ConversationListProps) 
       const profiles = await userService.getUsersBatch(ids)
       setFollowing(
         profiles.filter(
-          (u) => u.id !== user.id && (!u.role || u.role.toUpperCase() === "USER")
+          (u) => u.id !== user.id && !blockedIds.has(u.id) && (!u.role || u.role.toUpperCase() === "USER")
         )
       )
     } catch {

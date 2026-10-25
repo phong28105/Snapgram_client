@@ -230,6 +230,11 @@ export function AccountSettingsDialog({
       await userService.unblockUser(targetId)
       setBlockedUsers((prev) => prev.filter((u) => u.userId !== targetId))
       toast.success(`Đã bỏ chặn @${username}`)
+      window.dispatchEvent(
+        new CustomEvent("snapgram:block-updated", {
+          detail: { userId: targetId, username, blocked: false },
+        })
+      )
     } catch (err) {
       toast.error(getErrorMessage(err, "Không thể bỏ chặn người dùng."))
     }

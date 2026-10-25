@@ -331,12 +331,22 @@ export default function PublicUserProfilePage({
           await userService.unblockUser(profile.id)
           setIsBlocked(false)
           toast.success(`Đã bỏ chặn @${profile.username}`)
+          window.dispatchEvent(
+            new CustomEvent("snapgram:block-updated", {
+              detail: { userId: profile.id, username: profile.username, blocked: false },
+            })
+          )
         } else {
           await userService.blockUser(profile.id)
           setIsBlocked(true)
           setFollowStatus("NONE")
           toast.success(`Đã chặn @${profile.username}`)
           setIsNotFound(true)
+          window.dispatchEvent(
+            new CustomEvent("snapgram:block-updated", {
+              detail: { userId: profile.id, username: profile.username, blocked: true },
+            })
+          )
         }
       } catch (err) {
         toast.error(getErrorMessage(err, "Không thể thực hiện thao tác chặn."))
