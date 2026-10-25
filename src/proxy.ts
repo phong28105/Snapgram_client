@@ -11,6 +11,7 @@ function isPublicContentPath(pathname: string): boolean {
     pathname === "/payment/result" ||
     pathname === "/explore" ||
     pathname === "/reels" ||
+    pathname.startsWith("/oauth/") ||
     pathname.startsWith("/p/") ||
     pathname.startsWith("/reel/") ||
     pathname.startsWith("/u/")
