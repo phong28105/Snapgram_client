@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -10,6 +10,7 @@ import SnapgramLogo from "@/components/logo/SnapgramLogo"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import FacebookLoginButton from "@/components/auth/facebook-login-button"
 import { loginSchema, twoFaSchema, type LoginInput, type TwoFaInput } from "@/validation/auth.schema"
 import { useAuth } from "@/hooks/use-auth"
 import axios from "axios"
@@ -23,6 +24,15 @@ export default function LoginForm({ onSuccess }: LoginFormProps = {}) {
   const [showPassword, setShowPassword] = useState(false)
   const [requiresTwoFa, setRequiresTwoFa] = useState(false)
   const [tempToken, setTempToken] = useState<string | null>(null)
+
+  useEffect(() => {
+    const storedTempToken = typeof window !== "undefined" ? sessionStorage.getItem("snapgram_2fa_temp_token") : null
+    if (storedTempToken) {
+      sessionStorage.removeItem("snapgram_2fa_temp_token")
+      setTempToken(storedTempToken)
+      setRequiresTwoFa(true)
+    }
+  }, [])
 
   const handleLoginSuccess = () => {
     if (onSuccess) {
@@ -255,9 +265,25 @@ export default function LoginForm({ onSuccess }: LoginFormProps = {}) {
         </div>
       )}
 
+      {!requiresTwoFa && (
+        <>
+          <div className="flex items-center gap-x-4 w-full my-5">
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-xs text-muted-foreground font-medium">hoặc</span>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+
+          <FacebookLoginButton
+            onSuccess={handleLoginSuccess}
+            onRequiresTwoFa={(token) => {
+              setTempToken(token)
+              setRequiresTwoFa(true)
+            }}
+          />
+        </>
+      )}
+
       <div className="flex items-center gap-x-4 w-full my-6">
-        <div className="flex-1 h-px bg-border" />
-        <span className="text-xs text-muted-foreground font-medium">hoặc</span>
         <div className="flex-1 h-px bg-border" />
       </div>
 

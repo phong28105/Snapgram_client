@@ -20,6 +20,12 @@ export interface LoginPayload {
   password: string
 }
 
+export interface FacebookLoginPayload {
+  code?: string
+  redirectUri?: string
+  accessToken?: string
+}
+
 export interface RegisterPayload {
   username: string
   email: string

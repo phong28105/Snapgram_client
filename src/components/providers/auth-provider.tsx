@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { authService } from "@/services/auth.service"
 import { userService } from "@/services/user.service"
 import type {
+  FacebookLoginPayload,
   LoginPayload,
   LoginResponse,
   TwoFaPayload,
@@ -17,6 +18,7 @@ export interface AuthContextType {
   isAuthenticated: boolean
   isLoading: boolean
   login: (params: LoginPayload) => Promise<LoginResponse>
+  loginFacebook: (params: FacebookLoginPayload) => Promise<LoginResponse>
   login2Fa: (params: TwoFaPayload) => Promise<LoginResponse>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
@@ -94,6 +96,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return res
   }
 
+  const loginFacebook = async (params: FacebookLoginPayload): Promise<LoginResponse> => {
+    const res = await authService.loginFacebook(params)
+    if (res.requiresTwoFa) {
+      return res
+    }
+    if (res.user) {
+      setUser(res.user)
+    }
+    try {
+      await fetchCurrentUser()
+    } catch {
+      // Giữ user từ response login nếu getMe gặp độ trễ
+    }
+    return res
+  }
+
   const login2Fa = async (params: TwoFaPayload): Promise<LoginResponse> => {
     const res = await authService.login2Fa(params)
     if (res.user) {
@@ -133,6 +151,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: Boolean(user),
         isLoading,
         login,
+        loginFacebook,
         login2Fa,
         logout,
         refreshUser: fetchCurrentUser,

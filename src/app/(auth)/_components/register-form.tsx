@@ -10,6 +10,7 @@ import SnapgramLogo from "@/components/logo/SnapgramLogo"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import FacebookLoginButton from "@/components/auth/facebook-login-button"
 import { registerSchema, type RegisterInput } from "@/validation/auth.schema"
 import { authService } from "@/services/auth.service"
 import { useAuth } from "@/hooks/use-auth"
@@ -133,9 +134,15 @@ export default function RegisterForm() {
         </form>
       </Form>
 
-      <div className="flex items-center gap-x-4 w-full my-6">
+      <div className="flex items-center gap-x-4 w-full my-5">
         <div className="flex-1 h-px bg-border" />
         <span className="text-xs text-muted-foreground font-medium">hoặc</span>
+        <div className="flex-1 h-px bg-border" />
+      </div>
+
+      <FacebookLoginButton text="Đăng ký với Facebook" />
+
+      <div className="flex items-center gap-x-4 w-full my-6">
         <div className="flex-1 h-px bg-border" />
       </div>
 

@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api"
 import type {
+  FacebookLoginPayload,
   ForgotPasswordPayload,
   LoginPayload,
   LoginResponse,
@@ -19,6 +20,11 @@ export const authService = {
 
   async login(params: LoginPayload): Promise<LoginResponse> {
     const res = await apiClient.post<LoginResponse>("/api/auth/login", params)
+    return res.data
+  },
+
+  async loginFacebook(params: FacebookLoginPayload): Promise<LoginResponse> {
+    const res = await apiClient.post<LoginResponse>("/api/auth/facebook", params)
     return res.data
   },
 
