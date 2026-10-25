@@ -61,7 +61,6 @@ interface PostGridItem {
   comments: number
   contentType?: string
   mediaCount?: number
-  isRealMedia?: boolean
   isRealPost?: boolean
 }
 
@@ -72,7 +71,6 @@ export default function ProfilePage() {
 
   const [profile, setProfile] = useState<UserProfileResponse | null>(null)
   const [myNote, setMyNote] = useState<NoteResponse | null>(null)
-  const [myMedia, setMyMedia] = useState<MediaResponse[]>([])
   const [myPosts, setMyPosts] = useState<PostResponse[]>([])
   const [totalPosts, setTotalPosts] = useState(0)
   const [savedPosts, setSavedPosts] = useState<PostResponse[]>([])
@@ -118,11 +116,6 @@ export default function ProfilePage() {
           })
           .catch(() => {})
       }
-
-      mediaService
-        .getMyMedia(0, 20)
-        .then((page) => setMyMedia(page.content || []))
-        .catch(() => {})
 
       contentService
         .getMyPosts(0, 30)
@@ -222,10 +215,6 @@ export default function ProfilePage() {
         await contentService.deletePost(item.id)
         setMyPosts((prev) => prev.filter((p) => p.id !== item.id))
         toast.success("Đã xóa bài viết!")
-      } else if (item.isRealMedia) {
-        await mediaService.deleteMedia(item.id)
-        setMyMedia((prev) => prev.filter((m) => m.id !== item.id))
-        toast.success("Đã xóa ảnh/media khỏi kho lưu trữ!")
       }
     } catch (err) {
       toast.error(getErrorMessage(err, "Không thể xóa mục này."))
@@ -262,10 +251,13 @@ export default function ProfilePage() {
     }
   }
 
-  const handleDeleteArchivedStory = async (storyId: string) => {
+  const handleDeleteArchivedStory = async (story: StoryResponse) => {
     try {
-      await contentService.deleteStory(storyId)
-      setArchivedStories((prev) => prev.filter((s) => s.id !== storyId))
+      await contentService.deleteStory(story.id)
+      if (story.mediaId) {
+        mediaService.deleteMedia(story.mediaId).catch(() => {})
+      }
+      setArchivedStories((prev) => prev.filter((s) => s.id !== story.id))
       setViewingArchivedStory(null)
       toast.success("Đã xóa vĩnh viễn story khỏi kho lưu trữ.")
     } catch (err) {
@@ -300,28 +292,6 @@ export default function ProfilePage() {
     }
   })
 
-  const realMediaGridItems: PostGridItem[] = myMedia.map((m) => {
-    const isVideo = isVideoMedia(m.url, m.mimeType)
-    const poster = safePoster(m.thumbnailUrl, m.url)
-    return {
-      id: m.id,
-      image: isVideo ? poster : poster || m.url || "/profile.jpg",
-      videoUrl: isVideo ? m.url : undefined,
-      likes: 0,
-      comments: 0,
-      contentType: isVideo ? "VIDEO" : "POST",
-      mediaCount: 1,
-      isRealMedia: true,
-    }
-  })
-
-  const combinedMyItems =
-    realPostGridItems.length > 0
-      ? realPostGridItems
-      : realMediaGridItems.length > 0
-      ? realMediaGridItems
-      : []
-
   const savedGridItems: PostGridItem[] = savedPosts.map((p) => {
     const firstMedia = p.mediaItems?.[0]
     const media = firstMedia?.mediaUrl || p.mediaUrl || ""
@@ -342,12 +312,14 @@ export default function ProfilePage() {
     }
   })
 
-  const displayedGridItems =
+  const displayedGridItems: PostGridItem[] =
     activeTab === "reels"
-      ? combinedMyItems.filter((item) => item.contentType === "REEL")
+      ? realPostGridItems.filter((item) => item.contentType === "REEL")
       : activeTab === "saved"
       ? savedGridItems
-      : combinedMyItems
+      : activeTab === "tagged"
+      ? []
+      : realPostGridItems
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -448,7 +420,7 @@ export default function ProfilePage() {
               {/* Counts: Posts, Followers, Following */}
               <div className="flex justify-center sm:justify-start items-center gap-8 text-sm">
                 <div>
-                  <span className="font-semibold">{(totalPosts || combinedMyItems.length).toLocaleString("vi-VN")}</span>{" "}
+                  <span className="font-semibold">{(totalPosts || realPostGridItems.length).toLocaleString("vi-VN")}</span>{" "}
                   <span className="text-muted-foreground">bài viết</span>
                 </div>
                 <button
@@ -812,7 +784,7 @@ export default function ProfilePage() {
                       </div>
                     </Link>
 
-                    {(post.isRealMedia || post.isRealPost) && activeTab !== "saved" && (
+                    {post.isRealPost && activeTab !== "saved" && (
                       <button
                         type="button"
                         onClick={(e) => handleDeleteItem(post, e)}
@@ -1089,7 +1061,7 @@ export default function ProfilePage() {
                     type="button"
                     variant="destructive"
                     size="sm"
-                    onClick={() => handleDeleteArchivedStory(viewingArchivedStory.id)}
+                    onClick={() => handleDeleteArchivedStory(viewingArchivedStory)}
                     className="text-xs gap-1.5"
                   >
                     <Trash2 className="w-3.5 h-3.5" />

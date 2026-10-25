@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react"
 import {
   ChevronLeft,
   ChevronRight,
+  Clock,
   Eye,
   Heart,
   Loader2,
@@ -32,15 +33,47 @@ import { toast } from "sonner"
 import type { ContentVisibility, StoryViewerResponse } from "@/types/content.type"
 import type { UserProfileResponse } from "@/types/user.type"
 
+function formatStoryCountdown(expiresAt?: string, createdAt?: string, nowMs = Date.now()): string {
+  let targetTime = 0
+  if (expiresAt) {
+    targetTime = new Date(expiresAt).getTime()
+  } else if (createdAt) {
+    targetTime = new Date(createdAt).getTime() + 24 * 60 * 60 * 1000
+  } else {
+    return "24h"
+  }
+
+  const diffMs = targetTime - nowMs
+  if (diffMs <= 0) {
+    return "Đã hết hạn"
+  }
+
+  const totalSecs = Math.floor(diffMs / 1000)
+  const hours = Math.floor(totalSecs / 3600)
+  const minutes = Math.floor((totalSecs % 3600) / 60)
+  const seconds = totalSecs % 60
+
+  if (hours > 0) {
+    return `Còn ${hours}h ${minutes}m`
+  }
+  if (minutes > 0) {
+    return `Còn ${minutes}p ${seconds}s`
+  }
+  return `Còn ${seconds}s`
+}
+
 interface StoryItem {
   id: string
   authorId?: string
   username: string
   avatar: string
   media: string
+  mediaId?: string
   mediaType?: string
   caption?: string
   timeAgo: string
+  createdAt?: string
+  expiresAt?: string
   viewedByMe?: boolean
   isReal?: boolean
 }
@@ -63,6 +96,7 @@ export default function Stories() {
   const [isPaused, setIsPaused] = useState(false)
   const [replyText, setReplyText] = useState("")
   const [isSendingReply, setIsSendingReply] = useState(false)
+  const [currentTick, setCurrentTick] = useState(Date.now())
 
   // Create Story Modal State
   const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -77,6 +111,16 @@ export default function Stories() {
   const [viewers, setViewers] = useState<StoryViewerResponse[]>([])
   const [viewerProfileMap, setViewerProfileMap] = useState<Record<string, UserProfileResponse>>({})
   const [isLoadingViewers, setIsLoadingViewers] = useState(false)
+
+  // Live countdown timer ticker for open story
+  useEffect(() => {
+    if (activeStoryIndex === null) return
+    setCurrentTick(Date.now())
+    const interval = setInterval(() => {
+      setCurrentTick(Date.now())
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [activeStoryIndex])
 
   const loadStoryFeed = useCallback(async () => {
     setIsLoadingStories(true)
@@ -95,9 +139,12 @@ export default function Stories() {
               ? user.avatarUrl
               : s.authorAvatarUrl || "/profile.jpg",
           media: s.mediaUrl || "/auth-image-1.webp",
+          mediaId: s.mediaId,
           mediaType: s.mediaType,
           caption: s.caption,
-          timeAgo: "Mới đây",
+          createdAt: s.createdAt,
+          expiresAt: s.expiresAt,
+          timeAgo: formatStoryCountdown(s.expiresAt, s.createdAt),
           viewedByMe: s.viewedByMe,
           isReal: true,
         }))
@@ -241,9 +288,12 @@ export default function Stories() {
         username: user?.username || "Tin của bạn",
         avatar: user?.avatarUrl || "/profile.jpg",
         media: created.mediaUrl || mediaRes.url || storyPreview,
+        mediaId: created.mediaId || mediaRes.id,
         mediaType: created.mediaType,
         caption: created.caption,
-        timeAgo: "Vừa xong",
+        createdAt: created.createdAt || new Date().toISOString(),
+        expiresAt: created.expiresAt || new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+        timeAgo: "Còn 24h",
         viewedByMe: true,
         isReal: true,
       }
@@ -263,7 +313,11 @@ export default function Stories() {
 
   const handleDeleteStory = async (storyId: string) => {
     try {
+      const target = stories.find((s) => s.id === storyId)
       await contentService.deleteStory(storyId)
+      if (target?.mediaId) {
+        mediaService.deleteMedia(target.mediaId).catch(() => {})
+      }
       setStories((prev) => prev.filter((s) => s.id !== storyId))
       closeStory()
       toast.success("Đã xóa tin của bạn.")
@@ -489,12 +543,17 @@ export default function Stories() {
                       alt={activeStory.username}
                       className="w-8 h-8 rounded-full object-cover border border-white/60 p-0.5"
                     />
-                    <span className="font-semibold text-xs">
-                      {activeStory.username}
-                    </span>
-                    <span className="text-[10px] text-white/70">
-                      {activeStory.timeAgo}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-xs leading-tight">
+                        {activeStory.username}
+                      </span>
+                      <span className="text-[10px] text-white/85 flex items-center gap-1 font-medium pt-0.5">
+                        <Clock className="w-2.5 h-2.5 text-amber-300 shrink-0" />
+                        <span>
+                          {formatStoryCountdown(activeStory.expiresAt, activeStory.createdAt, currentTick)}
+                        </span>
+                      </span>
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-1.5">
