@@ -73,8 +73,21 @@ export function ChatThread({ conversationId, onBack, backAlwaysVisible = false }
 
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const bottomRef = useRef<HTMLDivElement | null>(null)
+  const topSentinelRef = useRef<HTMLDivElement | null>(null)
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const nearBottomRef = useRef(true)
+  const isLoadingMoreRef = useRef(false)
+  const hasInitialScrolledRef = useRef(false)
+  const hasMoreRef = useRef(false)
+  const nextCursorRef = useRef<string | undefined>(undefined)
+
+  useEffect(() => {
+    hasMoreRef.current = hasMore
+  }, [hasMore])
+
+  useEffect(() => {
+    nextCursorRef.current = nextCursor
+  }, [nextCursor])
 
   const partner = conversation?.partner
   const partnerName = partner?.username || partner?.displayName || "Trò chuyện"
@@ -100,6 +113,8 @@ export function ChatThread({ conversationId, onBack, backAlwaysVisible = false }
 
   const loadAll = useCallback(async () => {
     setIsLoading(true)
+    hasInitialScrolledRef.current = false
+    isLoadingMoreRef.current = false
     try {
       const [conv, page] = await Promise.all([
         chatService.getConversation(conversationId),
@@ -121,13 +136,17 @@ export function ChatThread({ conversationId, onBack, backAlwaysVisible = false }
     void loadAll()
   }, [loadAll])
 
-  // Cuộn xuống cuối khi mở hội thoại
+  // Cuộn xuống cuối khi mở hội thoại và chỉ kích hoạt lazy load sau khi đã ở đáy
   useEffect(() => {
     if (!isLoading) {
-      requestAnimationFrame(() => {
+      const timer = setTimeout(() => {
         bottomRef.current?.scrollIntoView({ behavior: "auto" })
         nearBottomRef.current = true
-      })
+        requestAnimationFrame(() => {
+          hasInitialScrolledRef.current = true
+        })
+      }, 60)
+      return () => clearTimeout(timer)
     }
   }, [isLoading, conversationId])
 
@@ -167,35 +186,90 @@ export function ChatThread({ conversationId, onBack, backAlwaysVisible = false }
     }
   }, [lastEvent, conversationId, user?.id, markRead])
 
+  const handleLoadMore = useCallback(async () => {
+    const cursor = nextCursorRef.current
+    if (!hasMoreRef.current || isLoadingMoreRef.current || !cursor) return
+
+    isLoadingMoreRef.current = true
+    setIsLoadingMore(true)
+
+    const el = scrollRef.current
+    const previousHeight = el?.scrollHeight ?? 0
+    const previousTop = el?.scrollTop ?? 0
+
+    try {
+      const page = await chatService.getMessages(conversationId, {
+        before: cursor,
+        size: 30,
+      })
+
+      setMessages((prev) => {
+        const existingIds = new Set(prev.map((m) => m.id))
+        const unique = (page.content || []).filter((m) => !existingIds.has(m.id))
+        return [...unique, ...prev]
+      })
+      setHasMore(Boolean(page.hasMore))
+      setNextCursor(page.nextCursor)
+
+      // Giữ nguyên vị trí đọc sau khi chèn tin cũ lên đầu
+      requestAnimationFrame(() => {
+        if (scrollRef.current) {
+          const heightDiff = scrollRef.current.scrollHeight - previousHeight
+          scrollRef.current.scrollTop = heightDiff + previousTop
+        }
+        isLoadingMoreRef.current = false
+        setIsLoadingMore(false)
+      })
+    } catch {
+      toast.error("Không tải được tin nhắn cũ.")
+      isLoadingMoreRef.current = false
+      setIsLoadingMore(false)
+    }
+  }, [conversationId])
+
+  // Lắng nghe IntersectionObserver ở đỉnh để tự động lazy load khi kéo lên
+  useEffect(() => {
+    const sentinel = topSentinelRef.current
+    const container = scrollRef.current
+    if (!sentinel || !container) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0]
+        if (
+          entry.isIntersecting &&
+          hasInitialScrolledRef.current &&
+          hasMoreRef.current &&
+          !isLoadingMoreRef.current
+        ) {
+          void handleLoadMore()
+        }
+      },
+      {
+        root: container,
+        rootMargin: "140px 0px 0px 0px",
+        threshold: 0,
+      }
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [handleLoadMore])
+
   const handleScroll = () => {
     const el = scrollRef.current
     if (!el) return
     const distance = el.scrollHeight - el.scrollTop - el.clientHeight
     nearBottomRef.current = distance < NEAR_BOTTOM_PX
-  }
 
-  const handleLoadMore = async () => {
-    if (!hasMore || isLoadingMore || !nextCursor) return
-    setIsLoadingMore(true)
-    const el = scrollRef.current
-    const previousHeight = el?.scrollHeight ?? 0
-    try {
-      const page = await chatService.getMessages(conversationId, {
-        before: nextCursor,
-        size: 30,
-      })
-      setMessages((prev) => [...(page.content || []), ...prev])
-      setHasMore(Boolean(page.hasMore))
-      setNextCursor(page.nextCursor)
-      // Giữ nguyên vị trí đọc sau khi chèn tin cũ lên đầu
-      requestAnimationFrame(() => {
-        if (!el) return
-        el.scrollTop = el.scrollHeight - previousHeight
-      })
-    } catch {
-      toast.error("Không tải được tin nhắn cũ.")
-    } finally {
-      setIsLoadingMore(false)
+    // Dự phòng: tự động kích hoạt lazy load khi người dùng cuộn lên gần đầu (< 100px)
+    if (
+      hasInitialScrolledRef.current &&
+      el.scrollTop < 100 &&
+      hasMoreRef.current &&
+      !isLoadingMoreRef.current
+    ) {
+      void handleLoadMore()
     }
   }
 
@@ -375,16 +449,51 @@ export function ChatThread({ conversationId, onBack, backAlwaysVisible = false }
           </div>
         ) : (
           <>
-            {hasMore && (
-              <div className="flex justify-center pb-2">
-                <button
-                  type="button"
-                  onClick={handleLoadMore}
-                  disabled={isLoadingMore}
-                  className="text-[11px] text-primary hover:underline disabled:opacity-50"
-                >
-                  {isLoadingMore ? "Đang tải…" : "Tải tin nhắn cũ hơn"}
-                </button>
+            {/* Đầu đoạn hội thoại khi đã cuộn hết tin nhắn cũ */}
+            {!hasMore && (
+              <div className="flex flex-col items-center justify-center text-center py-6 px-4 space-y-2 border-b border-border/40 mb-3 select-none">
+                <div className="p-[2px] rounded-full bg-gradient-to-tr from-amber-400 via-rose-500 to-fuchsia-600">
+                  <img
+                    src={partnerAvatar}
+                    alt={partnerName}
+                    className="w-16 h-16 rounded-full object-cover bg-background p-0.5"
+                  />
+                </div>
+                <div className="space-y-0.5">
+                  <div className="flex items-center justify-center gap-1">
+                    <span className="font-semibold text-sm">{partnerName}</span>
+                    <VerifiedBadge
+                      verified={partner?.verified}
+                      verifiedUntil={partner?.verifiedUntil}
+                      size={14}
+                    />
+                  </div>
+                  {partner?.displayName && partner?.username && (
+                    <p className="text-xs text-muted-foreground">@{partner.username}</p>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground max-w-xs">
+                  Đây là phần đầu của đoạn chat với {partnerName}.
+                </p>
+                {partner?.username && (
+                  <Link
+                    href={`/u/${partner.username}`}
+                    className="text-xs font-semibold px-3 py-1 rounded-lg bg-secondary hover:bg-secondary/80 text-secondary-foreground transition mt-1"
+                  >
+                    Xem trang cá nhân
+                  </Link>
+                )}
+              </div>
+            )}
+
+            {/* Top sentinel để IntersectionObserver nhận biết khi chạm đỉnh */}
+            <div ref={topSentinelRef} className="h-1 w-full pointer-events-none" />
+
+            {/* Trạng thái đang lazy load tin nhắn cũ */}
+            {isLoadingMore && (
+              <div className="flex items-center justify-center py-2.5 text-muted-foreground gap-2 text-xs">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                <span>Đang tải tin nhắn cũ hơn…</span>
               </div>
             )}
 
