@@ -111,7 +111,11 @@ export function ConversationList({ activeId, onSelect }: ConversationListProps) 
         return
       }
       const profiles = await userService.getUsersBatch(ids)
-      setFollowing(profiles.filter((u) => u.id !== user.id))
+      setFollowing(
+        profiles.filter(
+          (u) => u.id !== user.id && (!u.role || u.role.toUpperCase() === "USER")
+        )
+      )
     } catch {
       setFollowing([])
     } finally {

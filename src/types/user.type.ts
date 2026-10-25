@@ -3,6 +3,7 @@ export interface UserProfileResponse {
   username: string
   displayName?: string
   avatarUrl?: string
+  role?: string
   privateAccount?: boolean
   verified?: boolean
   verifiedUntil?: string

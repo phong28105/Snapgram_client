@@ -182,8 +182,10 @@ function ExploreContent() {
         userService.searchUsers(cleanTag || q, 0, 10),
         contentService.searchHashtags(cleanTag),
       ])
-      setSearchResults(
+      const rawUsers =
         usersRes.status === "fulfilled" ? usersRes.value.content || [] : []
+      setSearchResults(
+        rawUsers.filter((u) => !u.role || u.role.toUpperCase() === "USER")
       )
       setHashtagResults(
         tagsRes.status === "fulfilled" ? (tagsRes.value || []).slice(0, 8) : []

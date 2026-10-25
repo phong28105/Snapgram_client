@@ -107,6 +107,19 @@ export default function PublicUserProfilePage({
         setIsNotFound(true)
         return
       }
+
+      const isSelf = Boolean(
+        currentUser && (
+          currentUser.id === data.id ||
+          (data.username && currentUser.username?.toLowerCase() === data.username.toLowerCase())
+        )
+      )
+
+      if (!isSelf && data.role && data.role.toUpperCase() !== "USER") {
+        setIsNotFound(true)
+        return
+      }
+
       setProfile(data)
 
       if (data.username && usernameParam.toLowerCase() !== data.username.toLowerCase()) {

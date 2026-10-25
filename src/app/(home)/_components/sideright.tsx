@@ -57,12 +57,13 @@ const Sideright = () => {
 
         if (!active) return
 
-        // Loại bỏ chính mình và những người ĐÃ theo dõi khỏi danh sách gợi ý
+        // Loại bỏ chính mình, những người ĐÃ theo dõi, và các tài khoản không phải USER khỏi danh sách gợi ý
         const filtered = suggestedProfiles.filter(
           (item) =>
             item.id !== user?.id &&
             item.username?.toLowerCase() !== user?.username?.toLowerCase() &&
-            (!item.id || !followedIds.has(item.id))
+            (!item.id || !followedIds.has(item.id)) &&
+            (!item.role || item.role.toUpperCase() === "USER")
         )
 
         const list = filtered.slice(0, 5)
