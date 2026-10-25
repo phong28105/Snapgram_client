@@ -62,7 +62,7 @@ function parseNotificationMessage(item: NotificationResponse): string {
 }
 
 export function NotificationsSheet({ children }: NotificationsSheetProps) {
-  const { isAuthenticated } = useAuth()
+  const { user, isAuthenticated } = useAuth()
   const { openLoginModal } = useLoginModal()
   const [open, setOpen] = useState(false)
   const [notifications, setNotifications] = useState<NotificationResponse[]>([])
@@ -108,12 +108,43 @@ export function NotificationsSheet({ children }: NotificationsSheetProps) {
         })
         setUserProfileMap((prev) => ({ ...prev, ...pMap }))
       }
+
+      // Fetch follow status for all follow notifications so button reflects reality
+      const followActorIds = Array.from(
+        new Set(
+          notifs
+            .filter((n) => n.type === "FOLLOW" && n.actorId && n.actorId !== user?.id)
+            .map((n) => n.actorId!)
+        )
+      )
+
+      if (followActorIds.length > 0) {
+        try {
+          const statuses = await Promise.all(
+            followActorIds.map(async (id) => {
+              try {
+                const res = await contentService.getFollowStatus(id)
+                return { id, following: Boolean(res.following) }
+              } catch {
+                return { id, following: false }
+              }
+            })
+          )
+          const fMap: Record<string, boolean> = {}
+          statuses.forEach((s) => {
+            fMap[s.id] = s.following
+          })
+          setFollowedMap((prev) => ({ ...prev, ...fMap }))
+        } catch {
+          // Ignore
+        }
+      }
     } catch {
       // Ignore
     } finally {
       setIsLoading(false)
     }
-  }, [isAuthenticated])
+  }, [isAuthenticated, user?.id])
 
   useEffect(() => {
     if (open && isAuthenticated) {
@@ -347,14 +378,15 @@ export function NotificationsSheet({ children }: NotificationsSheetProps) {
                   </div>
                 </div>
 
-                {item.type === "FOLLOW" && item.actorId ? (
+                {item.type === "FOLLOW" && item.actorId && item.actorId !== user?.id ? (
                   <Button
                     type="button"
                     size="sm"
-                    variant={followedMap[username] ? "secondary" : "default"}
+                    variant={followedMap[item.actorId] ? "secondary" : "default"}
                     onClick={async () => {
-                      const next = !followedMap[username]
-                      setFollowedMap((prev) => ({ ...prev, [username]: next }))
+                      const isCurrentlyFollowed = Boolean(followedMap[item.actorId!])
+                      const next = !isCurrentlyFollowed
+                      setFollowedMap((prev) => ({ ...prev, [item.actorId!]: next }))
                       try {
                         if (next) {
                           await contentService.followUser(item.actorId!)
@@ -363,13 +395,20 @@ export function NotificationsSheet({ children }: NotificationsSheetProps) {
                           await contentService.unfollowUser(item.actorId!)
                           toast.success(`Đã hủy theo dõi @${username}`)
                         }
-                      } catch {
-                        setFollowedMap((prev) => ({ ...prev, [username]: !next }))
+                      } catch (err: any) {
+                        const status = err?.response?.status
+                        const msg = err?.response?.data?.message || ""
+                        if (next && (status === 409 || msg.includes("Already following"))) {
+                          setFollowedMap((prev) => ({ ...prev, [item.actorId!]: true }))
+                        } else {
+                          setFollowedMap((prev) => ({ ...prev, [item.actorId!]: isCurrentlyFollowed }))
+                          toast.error(getErrorMessage(err, "Thao tác thất bại."))
+                        }
                       }
                     }}
                     className="h-7 text-xs px-2.5 shrink-0"
                   >
-                    {followedMap[username] ? "Đang theo dõi" : "Theo dõi lại"}
+                    {followedMap[item.actorId] ? "Đang theo dõi" : "Theo dõi lại"}
                   </Button>
                 ) : targetPostId ? (
                   <Link
