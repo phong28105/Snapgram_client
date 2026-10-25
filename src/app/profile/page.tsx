@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import {
+  Archive,
   Bookmark,
   Camera,
   Film,
@@ -17,13 +18,14 @@ import {
   MessageSquarePlus,
   Plus,
   Settings,
+  Sparkles,
   Tag,
   Trash2,
 } from "lucide-react"
 import { toast } from "sonner"
 import { CreateHighlightDialog } from "@/components/content/create-highlight-dialog"
 import { HighlightViewer } from "@/components/content/highlight-viewer"
-import type { HighlightResponse } from "@/types/content.type"
+import type { HighlightResponse, StoryResponse } from "@/types/content.type"
 import Sidebar from "@/app/(home)/_components/sidebar"
 import Navbot from "@/app/(home)/_components/navbot"
 import Navbar from "@/app/(home)/_components/navbar"
@@ -75,6 +77,10 @@ export default function ProfilePage() {
   const [totalPosts, setTotalPosts] = useState(0)
   const [savedPosts, setSavedPosts] = useState<PostResponse[]>([])
   const [collections, setCollections] = useState<CollectionResponse[]>([])
+  const [savedSubTab, setSavedSubTab] = useState<"posts" | "stories">("posts")
+  const [archivedStories, setArchivedStories] = useState<StoryResponse[]>([])
+  const [isLoadingArchivedStories, setIsLoadingArchivedStories] = useState(false)
+  const [viewingArchivedStory, setViewingArchivedStory] = useState<StoryResponse | null>(null)
   const [highlightsList, setHighlightsList] = useState<HighlightResponse[]>([])
   const [activeHighlightId, setActiveHighlightId] = useState<string | null>(null)
   const [isCreateHighlightOpen, setIsCreateHighlightOpen] = useState(false)
@@ -134,6 +140,11 @@ export default function ProfilePage() {
       contentService
         .getMyCollections()
         .then((cols) => setCollections(cols || []))
+        .catch(() => {})
+
+      contentService
+        .getMyArchivedStories(0, 50)
+        .then((page) => setArchivedStories(page.content || []))
         .catch(() => {})
 
       if (p.id) {
@@ -251,12 +262,21 @@ export default function ProfilePage() {
     }
   }
 
+  const handleDeleteArchivedStory = async (storyId: string) => {
+    try {
+      await contentService.deleteStory(storyId)
+      setArchivedStories((prev) => prev.filter((s) => s.id !== storyId))
+      setViewingArchivedStory(null)
+      toast.success("Đã xóa vĩnh viễn story khỏi kho lưu trữ.")
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Không thể xóa story."))
+    }
+  }
+
   const username = profile?.username || user?.username || "snapgram_user"
   const displayName = profile?.displayName || user?.displayName || "Người dùng Snapgram"
   const avatarUrl = profile?.avatarUrl || user?.avatarUrl || "/profile.jpg"
-  const bio =
-    profile?.bio ??
-    "Nhiếp ảnh · Phong cách sống · Sáng tạo nội dung 📸✨\nKhám phá những khoảnh khắc đẹp trong cuộc sống hàng ngày."
+  const bio = profile?.bio || ""
   const website = profile?.website
 
   const realPostGridItems: PostGridItem[] = myPosts.map((p) => {
@@ -479,7 +499,7 @@ export default function ProfilePage() {
                   <p className="text-muted-foreground whitespace-pre-line leading-relaxed">{bio}</p>
                 )}
 
-                {website ? (
+                {website && (
                   <a
                     href={website.startsWith("http") ? website : `https://${website}`}
                     target="_blank"
@@ -489,13 +509,6 @@ export default function ProfilePage() {
                     <Globe className="w-3 h-3" />
                     {website}
                   </a>
-                ) : (
-                  <Link
-                    href={`/u/${username}`}
-                    className="font-medium text-primary hover:underline block pt-1"
-                  >
-                    snapgram.local/u/{username}
-                  </Link>
                 )}
               </div>
             </div>
@@ -590,46 +603,140 @@ export default function ProfilePage() {
               </button>
             </div>
 
-            {/* Saved Collections Bar when on "saved" tab */}
+            {/* Saved Sub-Tabs Bar: Bài viết đã lưu vs Kho lưu trữ tin */}
             {activeTab === "saved" && (
-              <div className="py-3 flex items-center justify-between gap-3 flex-wrap border-b border-border/40 mb-2">
-                <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
-                  <span className="px-3 py-1 rounded-full bg-foreground text-background text-xs font-semibold">
-                    Tất cả bài đã lưu
-                  </span>
-                  {collections.map((col) => (
-                    <div
-                      key={col.id}
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary text-secondary-foreground text-xs font-medium"
-                    >
-                      <span>{col.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteCollection(col.id)}
-                        className="text-muted-foreground hover:text-destructive"
-                        title="Xóa bộ sưu tập"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
+              <div className="space-y-3 mb-4">
+                <div className="flex items-center gap-2 border-b border-border/40 pb-2">
+                  <button
+                    type="button"
+                    onClick={() => setSavedSubTab("posts")}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition ${
+                      savedSubTab === "posts"
+                        ? "bg-foreground text-background"
+                        : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                    }`}
+                  >
+                    <Bookmark className="w-3.5 h-3.5" />
+                    <span>Bài viết đã lưu</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSavedSubTab("stories")}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition ${
+                      savedSubTab === "stories"
+                        ? "bg-foreground text-background"
+                        : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                    }`}
+                  >
+                    <Archive className="w-3.5 h-3.5" />
+                    <span>Kho lưu trữ tin (Riêng tư 🔒)</span>
+                    <span className="text-[10px] px-1.5 py-0.2 bg-primary/20 text-primary rounded-full font-bold">
+                      {archivedStories.length}
+                    </span>
+                  </button>
                 </div>
 
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setIsCollectionModalOpen(true)}
-                  className="h-8 text-xs gap-1.5 shrink-0"
-                >
-                  <FolderPlus className="w-3.5 h-3.5" />
-                  <span>Bộ sưu tập mới</span>
-                </Button>
+                {savedSubTab === "posts" && (
+                  <div className="py-2 flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
+                      <span className="px-3 py-1 rounded-full bg-secondary text-secondary-foreground text-xs font-semibold">
+                        Tất cả bài đã lưu
+                      </span>
+                      {collections.map((col) => (
+                        <div
+                          key={col.id}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary text-secondary-foreground text-xs font-medium"
+                        >
+                          <span>{col.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCollection(col.id)}
+                            className="text-muted-foreground hover:text-destructive"
+                            title="Xóa bộ sưu tập"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setIsCollectionModalOpen(true)}
+                      className="h-8 text-xs gap-1.5 shrink-0"
+                    >
+                      <FolderPlus className="w-3.5 h-3.5" />
+                      <span>Bộ sưu tập mới</span>
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Posts 3-column Grid or Empty State */}
-            {displayedGridItems.length === 0 ? (
+            {/* Content Display: Archived Stories vs Regular Grid */}
+            {activeTab === "saved" && savedSubTab === "stories" ? (
+              archivedStories.length === 0 ? (
+                <div className="py-20 text-center space-y-3">
+                  <div className="w-16 h-16 rounded-full border-2 border-foreground/20 flex items-center justify-center mx-auto text-muted-foreground">
+                    <Archive className="w-8 h-8" />
+                  </div>
+                  <h3 className="text-base font-bold text-foreground">Kho lưu trữ tin của bạn</h3>
+                  <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                    Các tin (Story) của bạn sau khi hết hạn 24h sẽ tự động được lưu trữ an toàn và riêng tư tại đây. Chỉ một mình bạn mới có thể xem được.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3 pt-2">
+                  <p className="text-xs text-muted-foreground">
+                    Chỉ bạn mới có thể nhìn thấy các tin đã lưu trữ của mình. Nhấp vào tin để xem lại hoặc thêm vào Tin nổi bật.
+                  </p>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                    {archivedStories.map((story) => (
+                      <div
+                        key={story.id}
+                        onClick={() => setViewingArchivedStory(story)}
+                        className="relative aspect-[9/16] rounded-xl overflow-hidden bg-muted cursor-pointer group shadow-sm hover:ring-2 hover:ring-primary transition"
+                      >
+                        {story.mediaType === "VIDEO" ? (
+                          <video
+                            src={story.mediaUrl}
+                            className="w-full h-full object-cover"
+                            preload="metadata"
+                          />
+                        ) : (
+                          <img
+                            src={story.mediaUrl}
+                            alt={story.caption || "Archived story"}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-2 text-white">
+                          <div className="flex items-center gap-1 text-[10px] text-white/80">
+                            <Lock className="w-2.5 h-2.5" />
+                            <span>
+                              {story.createdAt
+                                ? new Date(story.createdAt).toLocaleDateString("vi-VN", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                  })
+                                : "Đã lưu"}
+                            </span>
+                          </div>
+                          {story.caption && (
+                            <p className="text-[11px] truncate font-medium text-white/95">
+                              {story.caption}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            ) : displayedGridItems.length === 0 ? (
               <div className="py-20 text-center space-y-3">
                 <div className="w-16 h-16 rounded-full border-2 border-foreground/20 flex items-center justify-center mx-auto text-muted-foreground">
                   {activeTab === "posts" && <Camera className="w-8 h-8" />}
@@ -884,6 +991,114 @@ export default function ProfilePage() {
               </div>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Archived Story Dialog */}
+      <Dialog
+        open={Boolean(viewingArchivedStory)}
+        onOpenChange={(open) => {
+          if (!open) setViewingArchivedStory(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden bg-black border-none rounded-2xl text-white">
+          {viewingArchivedStory && (
+            <div className="relative flex flex-col items-center max-h-[85vh]">
+              {/* Top Header */}
+              <div className="w-full p-4 flex items-center justify-between z-10 bg-gradient-to-b from-black/80 to-transparent">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full border border-white/30 overflow-hidden bg-muted">
+                    <img
+                      src={avatarUrl}
+                      alt={displayName}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold">{username}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/20 text-white/90 flex items-center gap-1 font-medium">
+                        <Lock className="w-2.5 h-2.5" />
+                        Kho lưu trữ
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-white/60">
+                      Đã đăng ngày{" "}
+                      {viewingArchivedStory.createdAt
+                        ? new Date(viewingArchivedStory.createdAt).toLocaleDateString("vi-VN", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                          })
+                        : ""}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setViewingArchivedStory(null)}
+                  className="p-1 rounded-full bg-black/40 text-white/80 hover:text-white hover:bg-black/60 transition"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Media */}
+              <div className="relative w-full aspect-[9/16] bg-black flex items-center justify-center overflow-hidden">
+                {viewingArchivedStory.mediaType === "VIDEO" ? (
+                  <video
+                    src={viewingArchivedStory.mediaUrl}
+                    controls
+                    autoPlay
+                    className="max-h-full max-w-full object-contain"
+                  />
+                ) : (
+                  <img
+                    src={viewingArchivedStory.mediaUrl}
+                    alt={viewingArchivedStory.caption || "Archived story"}
+                    className="max-h-full max-w-full object-contain"
+                  />
+                )}
+              </div>
+
+              {/* Caption & Actions */}
+              <div className="w-full p-4 bg-black/90 space-y-3 z-10 border-t border-white/10">
+                {viewingArchivedStory.caption && (
+                  <p className="text-xs text-white/90 text-center">
+                    {viewingArchivedStory.caption}
+                  </p>
+                )}
+
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setViewingArchivedStory(null)
+                      setIsCreateHighlightOpen(true)
+                    }}
+                    className="flex-1 text-xs gap-1.5 bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Thêm vào Tin nổi bật</span>
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleDeleteArchivedStory(viewingArchivedStory.id)}
+                    className="text-xs gap-1.5"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Xóa</span>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

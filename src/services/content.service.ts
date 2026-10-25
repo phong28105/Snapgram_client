@@ -275,6 +275,28 @@ export const contentService = {
   },
 
   /**
+   * Kho lưu trữ story đã hết hạn của tôi (Riêng tư)
+   * GET /api/stories/archive
+   */
+  async getMyArchivedStories(page = 0, size = 20): Promise<PageStoryResponse> {
+    const response = await apiClient.get<PageStoryResponse>("/api/stories/archive", {
+      params: { page, size },
+    });
+    return response.data;
+  },
+
+  /**
+   * Toàn bộ story của tôi (Active + Archived) để làm Tin nổi bật
+   * GET /api/stories/me
+   */
+  async getMyStories(page = 0, size = 50): Promise<PageStoryResponse> {
+    const response = await apiClient.get<PageStoryResponse>("/api/stories/me", {
+      params: { page, size },
+    });
+    return response.data;
+  },
+
+  /**
    * Chi tiết story
    * GET /api/stories/{id}
    */

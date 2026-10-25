@@ -26,6 +26,7 @@ import { useLoginModal } from "@/components/providers/login-modal-provider"
 import { contentService } from "@/services/content.service"
 import { userService } from "@/services/user.service"
 import { mediaService } from "@/services/media.service"
+import { chatService } from "@/services/chat.service"
 import { getErrorMessage } from "@/lib/api"
 import { toast } from "sonner"
 import type { ContentVisibility, StoryViewerResponse } from "@/types/content.type"
@@ -61,6 +62,7 @@ export default function Stories() {
   const [progress, setProgress] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
   const [replyText, setReplyText] = useState("")
+  const [isSendingReply, setIsSendingReply] = useState(false)
 
   // Create Story Modal State
   const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -268,6 +270,41 @@ export default function Stories() {
     } catch (err) {
       toast.error(getErrorMessage(err, "Không thể xóa tin này."))
     }
+  }
+
+  const handleSendStoryReply = async (textToSend: string) => {
+    if (!textToSend.trim() || !activeStory?.authorId || isSendingReply) return
+
+    if (!isAuthenticated) {
+      openLoginModal()
+      return
+    }
+
+    setIsSendingReply(true)
+    try {
+      // 1. Tạo hoặc lấy cuộc trò chuyện 1-1 với tác giả story
+      const conversation = await chatService.getOrCreateDirectConversation({
+        targetUserId: activeStory.authorId,
+      })
+
+      // 2. Gửi tin nhắn phản hồi story
+      await chatService.sendMessage(conversation.id, {
+        content: textToSend.trim(),
+        type: "STORY_REPLY",
+        mediaUrl: activeStory.media,
+      })
+
+      toast.success(`Đã gửi phản hồi đến @${activeStory.username}`)
+      setReplyText("")
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Không thể gửi phản hồi. Vui lòng thử lại sau."))
+    } finally {
+      setIsSendingReply(false)
+    }
+  }
+
+  const handleQuickReaction = async (emoji: string) => {
+    await handleSendStoryReply(emoji)
   }
 
   const handleOpenViewers = async (storyId: string) => {
@@ -510,39 +547,59 @@ export default function Stories() {
               </div>
 
               {/* Caption & Bottom Reply Bar */}
-              <div className="relative z-10 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent space-y-2">
+              <div className="relative z-10 p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent space-y-2">
                 {activeStory.caption && (
                   <p className="text-xs text-white text-center px-2 drop-shadow">
                     {activeStory.caption}
                   </p>
                 )}
 
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={replyText}
-                    onChange={(e) => setReplyText(e.target.value)}
-                    placeholder={`Gửi tin nhắn cho ${activeStory.username}...`}
-                    className="flex-1 bg-white/20 backdrop-blur-md rounded-full px-4 py-2 text-xs text-white placeholder:text-white/60 border border-white/30 outline-none"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && replyText.trim()) {
-                        toast.success(
-                          `Đã gửi phản hồi đến ${activeStory.username}`
-                        )
-                        setReplyText("")
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      toast.success("Đã bày tỏ cảm xúc ❤️")
-                    }}
-                    className="p-2 rounded-full hover:bg-white/20 text-white transition"
-                  >
-                    <Heart className="w-6 h-6 hover:fill-rose-500 hover:text-rose-500 transition" />
-                  </button>
-                </div>
+                {!isMyActiveStory && (
+                  <div className="space-y-2">
+                    {/* Quick Reactions */}
+                    <div className="flex items-center justify-around px-2 py-1 bg-white/10 backdrop-blur-md rounded-full border border-white/20">
+                      {["❤️", "😂", "🔥", "😮", "😢", "👏"].map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          disabled={isSendingReply}
+                          onClick={() => handleQuickReaction(emoji)}
+                          className="text-base hover:scale-125 transition-transform active:scale-95 disabled:opacity-50"
+                          title={`Gửi cảm xúc ${emoji}`}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Input Reply */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={replyText}
+                        disabled={isSendingReply}
+                        onChange={(e) => setReplyText(e.target.value)}
+                        onFocus={() => setIsPaused(true)}
+                        onBlur={() => setIsPaused(false)}
+                        placeholder={`Gửi tin nhắn cho ${activeStory.username}...`}
+                        className="flex-1 bg-white/20 backdrop-blur-md rounded-full px-4 py-2 text-xs text-white placeholder:text-white/60 border border-white/30 outline-none disabled:opacity-50"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && replyText.trim()) {
+                            void handleSendStoryReply(replyText)
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        disabled={!replyText.trim() || isSendingReply}
+                        onClick={() => void handleSendStoryReply(replyText)}
+                        className="px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition disabled:opacity-40"
+                      >
+                        {isSendingReply ? "..." : "Gửi"}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </DialogContent>

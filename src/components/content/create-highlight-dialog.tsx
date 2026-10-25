@@ -33,7 +33,7 @@ export function CreateHighlightDialog({
       setSelectedStoryIds([])
       setIsLoadingStories(true)
       contentService
-        .getStoryFeed(0, 50)
+        .getMyStories(0, 50)
         .then((res) => {
           setAvailableStories(res.content || [])
         })
