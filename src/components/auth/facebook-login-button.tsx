@@ -29,12 +29,12 @@ export default function FacebookLoginButton({
 
     const appId = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID
     if (!appId) {
-      toast.error("Facebook App ID chưa được cấu hình.")
+      toast.error("Facebook App ID chưa được cấu hình trong biến môi trường.")
       return
     }
 
-    const state = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
-    sessionStorage.setItem("snapgram_facebook_oauth_state", state)
+    const rawState = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+    sessionStorage.setItem("snapgram_facebook_oauth_state", rawState)
 
     const params = new URLSearchParams(window.location.search)
     const redirectParam = params.get("redirect")
@@ -43,9 +43,10 @@ export default function FacebookLoginButton({
     }
 
     const redirectUri = `${window.location.origin}/oauth/callback/facebook`
+    const state = `popup:${rawState}`
     const dialogUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(
       redirectUri
-    )}&scope=email,public_profile&response_type=code&state=${state}`
+    )}&scope=email,public_profile&response_type=code&state=${encodeURIComponent(state)}`
 
     const width = 600
     const height = 650
@@ -60,23 +61,52 @@ export default function FacebookLoginButton({
       `width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes`
     )
 
-    // Fallback: nếu popup bị chặn bởi trình duyệt
+    // Fallback: nếu popup bị chặn hoàn toàn bởi trình duyệt
     if (!popup || popup.closed || typeof popup.closed === "undefined") {
-      window.location.href = dialogUrl
+      const fallbackState = `redirect:${rawState}`
+      const fallbackUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(
+        redirectUri
+      )}&scope=email,public_profile&response_type=code&state=${encodeURIComponent(fallbackState)}`
+      window.location.href = fallbackUrl
       return
     }
 
-    const handleMessage = async (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return
+    let handled = false
+    let timer: NodeJS.Timeout | null = null
+    let channel: BroadcastChannel | null = null
 
-      if (event.data?.type === "FACEBOOK_OAUTH_SUCCESS") {
-        window.removeEventListener("message", handleMessage)
-        clearInterval(timer)
+    const cleanup = () => {
+      if (timer) clearInterval(timer)
+      window.removeEventListener("message", handlePostMessage)
+      window.removeEventListener("storage", handleStorageEvent)
+      if (channel) {
+        channel.close()
+        channel = null
+      }
+    }
 
-        const { code, state: returnedState } = event.data
+    const handleOAuthResult = async (data: { type: string; code?: string; state?: string; error?: string }) => {
+      if (handled) return
+      handled = true
+      cleanup()
+
+      try {
+        if (popup && !popup.closed) {
+          popup.close()
+        }
+      } catch {}
+
+      if (data.type === "FACEBOOK_OAUTH_ERROR") {
+        setIsLoading(false)
+        toast.error(data.error || "Đăng nhập Facebook thất bại.")
+        return
+      }
+
+      if (data.type === "FACEBOOK_OAUTH_SUCCESS" && data.code) {
         const storedState = sessionStorage.getItem("snapgram_facebook_oauth_state")
         sessionStorage.removeItem("snapgram_facebook_oauth_state")
 
+        const returnedState = data.state?.replace(/^popup:/, "")
         if (storedState && returnedState && storedState !== returnedState) {
           toast.error("Xác thực bảo mật state không khớp. Vui lòng thử lại.")
           setIsLoading(false)
@@ -84,7 +114,7 @@ export default function FacebookLoginButton({
         }
 
         try {
-          const res = await loginFacebook({ code, redirectUri })
+          const res = await loginFacebook({ code: data.code, redirectUri })
           if (res.requiresTwoFa && res.tempToken) {
             if (onRequiresTwoFa) {
               onRequiresTwoFa(res.tempToken)
@@ -109,23 +139,54 @@ export default function FacebookLoginButton({
         } finally {
           setIsLoading(false)
         }
-      } else if (event.data?.type === "FACEBOOK_OAUTH_ERROR") {
-        window.removeEventListener("message", handleMessage)
-        clearInterval(timer)
-        setIsLoading(false)
-        toast.error(event.data.error || "Đăng nhập Facebook thất bại.")
       }
     }
 
-    window.addEventListener("message", handleMessage)
-
-    const timer = setInterval(() => {
-      if (popup.closed) {
-        clearInterval(timer)
-        window.removeEventListener("message", handleMessage)
-        setIsLoading(false)
+    // Kênh 1: BroadcastChannel (hoạt động 100% giữa tabs/windows cùng origin)
+    if (typeof BroadcastChannel !== "undefined") {
+      channel = new BroadcastChannel("snapgram_facebook_oauth")
+      channel.onmessage = (event) => {
+        if (event.data?.type === "FACEBOOK_OAUTH_SUCCESS" || event.data?.type === "FACEBOOK_OAUTH_ERROR") {
+          void handleOAuthResult(event.data)
+        }
       }
-    }, 800)
+    }
+
+    // Kênh 2: localStorage storage event (fallback đa trình duyệt)
+    const handleStorageEvent = (event: StorageEvent) => {
+      if (event.key === "snapgram_facebook_oauth_event" && event.newValue) {
+        try {
+          const parsed = JSON.parse(event.newValue)
+          localStorage.removeItem("snapgram_facebook_oauth_event")
+          if (parsed?.type === "FACEBOOK_OAUTH_SUCCESS" || parsed?.type === "FACEBOOK_OAUTH_ERROR") {
+            void handleOAuthResult(parsed)
+          }
+        } catch {}
+      }
+    }
+    window.addEventListener("storage", handleStorageEvent)
+
+    // Kênh 3: window.postMessage (truyền thống nếu opener còn liên kết)
+    const handlePostMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return
+      if (event.data?.type === "FACEBOOK_OAUTH_SUCCESS" || event.data?.type === "FACEBOOK_OAUTH_ERROR") {
+        void handleOAuthResult(event.data)
+      }
+    }
+    window.addEventListener("message", handlePostMessage)
+
+    // Giám sát khi người dùng chủ động đóng popup mà chưa hoàn tất
+    timer = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(timer!)
+        setTimeout(() => {
+          if (!handled) {
+            cleanup()
+            setIsLoading(false)
+          }
+        }, 500)
+      }
+    }, 600)
   }
 
   return (
