@@ -73,15 +73,21 @@ export const mediaService = {
 
   /**
    * Luồng Presigned Upload trọn gói (tạo URL -> PUT MinIO -> confirm)
+   * Tự động fallback sang Direct Upload (/api/media/upload) nếu presigned upload gặp lỗi mạng hoặc DNS.
    */
   async uploadViaPresigned(file: File): Promise<MediaResponse> {
-    const presigned = await this.createPresignedUpload({
-      fileName: file.name,
-      mimeType: file.type || "application/octet-stream",
-      sizeBytes: file.size,
-    })
-    await this.uploadFileToPresignedUrl(presigned.uploadUrl, file)
-    return this.confirmPresignedUpload(presigned.mediaId)
+    try {
+      const presigned = await this.createPresignedUpload({
+        fileName: file.name,
+        mimeType: file.type || "application/octet-stream",
+        sizeBytes: file.size,
+      })
+      await this.uploadFileToPresignedUrl(presigned.uploadUrl, file)
+      return await this.confirmPresignedUpload(presigned.mediaId)
+    } catch (err) {
+      console.warn("Presigned upload failed, falling back to direct upload:", err)
+      return await this.upload(file)
+    }
   },
 
   /**
