@@ -1,12 +1,15 @@
 "use client"
 
-import React, { Suspense, useEffect, useRef, useState } from "react"
+import React, { Suspense, useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   Clock,
+  Compass,
   Film,
+  Hash,
   Heart,
+  Layers,
   Loader2,
   MessageCircle,
   Search,
@@ -17,32 +20,23 @@ import Sidebar from "@/app/(home)/_components/sidebar"
 import Navbot from "@/app/(home)/_components/navbot"
 import Navbar from "@/app/(home)/_components/navbar"
 import { userService } from "@/services/user.service"
+import { contentService } from "@/services/content.service"
+import { isVideoMedia, safePoster } from "@/lib/media"
+import { VerifiedBadge } from "@/components/ui/verified-badge"
 import type { UserProfileResponse } from "@/types/user.type"
+import type { HashtagResponse, PostResponse } from "@/types/content.type"
 
 interface ExploreTile {
   id: string
   image: string
+  videoUrl?: string
   likes: number
   comments: number
   category: string
   isReel?: boolean
+  isCarousel?: boolean
   span?: string
 }
-
-const mockExploreItems: ExploreTile[] = [
-  { id: "post-1", image: "/profile.jpg", likes: 3410, comments: 84, category: "Nhiếp ảnh" },
-  { id: "post-2", image: "/auth-image-1.webp", likes: 5120, comments: 120, category: "Du lịch", isReel: true, span: "row-span-2" },
-  { id: "post-3", image: "/profile.jpg", likes: 1980, comments: 45, category: "Kiến trúc" },
-  { id: "post-4", image: "/auth-image-2.webp", likes: 8410, comments: 231, category: "Ẩm thực" },
-  { id: "post-5", image: "/profile.jpg", likes: 2150, comments: 39, category: "Nghệ thuật" },
-  { id: "post-6", image: "/profile.jpg", likes: 4560, comments: 92, category: "Thiết kế" },
-  { id: "post-7", image: "/auth-image-1.webp", likes: 6200, comments: 140, category: "Nhiếp ảnh", isReel: true, span: "row-span-2" },
-  { id: "post-8", image: "/profile.jpg", likes: 1820, comments: 29, category: "Du lịch" },
-  { id: "post-9", image: "/profile.jpg", likes: 3990, comments: 77, category: "Kiến trúc" },
-  { id: "post-10", image: "/auth-image-2.webp", likes: 7300, comments: 182, category: "Ẩm thực" },
-  { id: "post-11", image: "/profile.jpg", likes: 2450, comments: 51, category: "Nghệ thuật" },
-  { id: "post-12", image: "/profile.jpg", likes: 1910, comments: 34, category: "Thiết kế" },
-]
 
 const categories = [
   "Dành cho bạn",
@@ -56,6 +50,32 @@ const categories = [
 
 const RECENT_SEARCH_STORAGE_KEY = "snapgram_recent_searches"
 
+function mapPostToTile(p: PostResponse, idx: number): ExploreTile {
+  const firstMedia = p.mediaItems?.[0]
+  const rawMediaUrl = firstMedia?.mediaUrl || p.mediaUrl || ""
+  const isVideoItem =
+    isVideoMedia(rawMediaUrl, firstMedia?.mediaType) ||
+    p.contentType === "REEL" ||
+    p.contentType === "VIDEO"
+
+  // thumbnailUrl có thể bị gán nhầm thành chính URL file video -> bỏ qua
+  const poster = safePoster(firstMedia?.thumbnailUrl, rawMediaUrl)
+
+  const isReel = p.contentType === "REEL"
+  const isCarousel = p.contentType === "CAROUSEL" || (Boolean(p.mediaItems) && (p.mediaItems?.length ?? 0) > 1)
+  return {
+    id: p.id,
+    image: isVideoItem ? poster ?? "" : poster || rawMediaUrl,
+    videoUrl: isVideoItem ? rawMediaUrl : undefined,
+    likes: p.likeCount ?? 0,
+    comments: p.commentCount ?? 0,
+    category: "Dành cho bạn",
+    isReel,
+    isCarousel,
+    span: idx % 7 === 1 || idx % 7 === 4 ? "row-span-2" : undefined,
+  }
+}
+
 function ExploreContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -64,11 +84,50 @@ function ExploreContent() {
   const [searchQuery, setSearchQuery] = useState(initialQuery)
   const [isSearchFocused, setIsSearchFocused] = useState(false)
   const [activeCategory, setActiveCategory] = useState("Dành cho bạn")
+  const [activeHashtag, setActiveHashtag] = useState<string | null>(null)
   const [searchResults, setSearchResults] = useState<UserProfileResponse[]>([])
+  const [hashtagResults, setHashtagResults] = useState<HashtagResponse[]>([])
   const [recentSearches, setRecentSearches] = useState<UserProfileResponse[]>([])
   const [isSearching, setIsSearching] = useState(false)
+  const [isLoadingPosts, setIsLoadingPosts] = useState(true)
+  const [apiTiles, setApiTiles] = useState<ExploreTile[]>([])
 
   const searchContainerRef = useRef<HTMLDivElement | null>(null)
+
+  // Load explore posts từ API khi khởi tạo
+  const loadExplorePosts = useCallback(async () => {
+    setIsLoadingPosts(true)
+    try {
+      const res = await contentService.getExplorePosts(0, 30)
+      if (res.content && res.content.length > 0) {
+        setApiTiles(res.content.map(mapPostToTile))
+      }
+    } catch {
+      // Fallback
+    } finally {
+      setIsLoadingPosts(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadExplorePosts()
+  }, [loadExplorePosts])
+
+  // Lọc bài viết theo hashtag khi người dùng chọn hashtag
+  const loadPostsByTag = useCallback(async (tag: string) => {
+    setIsLoadingPosts(true)
+    try {
+      const postsRes = await contentService.getPostsByHashtag(tag, 0, 30)
+      const list = postsRes.content || []
+      if (list.length > 0) {
+        setApiTiles(list.map(mapPostToTile))
+      }
+    } catch {
+      // Keep existing
+    } finally {
+      setIsLoadingPosts(false)
+    }
+  }, [])
 
   // Load recent searches from localStorage
   useEffect(() => {
@@ -106,25 +165,32 @@ function ExploreContent() {
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  // Debounced user search via API
+  // Debounced song song: user search + hashtag search
   useEffect(() => {
     const q = searchQuery.trim()
     if (!q) {
       setSearchResults([])
+      setHashtagResults([])
       setIsSearching(false)
       return
     }
 
     const timer = setTimeout(async () => {
       setIsSearching(true)
-      try {
-        const res = await userService.searchUsers(q, 0, 12)
-        setSearchResults(res.content || [])
-      } catch {
-        setSearchResults([])
-      } finally {
-        setIsSearching(false)
-      }
+      const cleanTag = q.replace(/^#/, "")
+      const [usersRes, tagsRes] = await Promise.allSettled([
+        userService.searchUsers(cleanTag || q, 0, 10),
+        contentService.searchHashtags(cleanTag),
+      ])
+      const rawUsers =
+        usersRes.status === "fulfilled" ? usersRes.value.content || [] : []
+      setSearchResults(
+        rawUsers.filter((u) => !u.role || u.role.toUpperCase() === "USER")
+      )
+      setHashtagResults(
+        tagsRes.status === "fulfilled" ? (tagsRes.value || []).slice(0, 8) : []
+      )
+      setIsSearching(false)
     }, 280)
 
     return () => clearTimeout(timer)
@@ -170,20 +236,56 @@ function ExploreContent() {
     router.push(`/u/${userItem.username}`)
   }
 
+  const handleSelectHashtag = (tag: string) => {
+    setActiveHashtag(tag)
+    setActiveCategory(`#${tag}`)
+    setIsSearchFocused(false)
+    loadPostsByTag(tag)
+  }
+
+  const handleSelectCategory = (cat: string) => {
+    setActiveCategory(cat)
+    setActiveHashtag(null)
+    if (cat === "Dành cho bạn") {
+      loadExplorePosts()
+    } else {
+      loadPostsByTag(cat.toLowerCase())
+    }
+  }
+
+  const allTiles = apiTiles
+
   const filteredExploreItems =
     activeCategory === "Dành cho bạn"
-      ? mockExploreItems
-      : mockExploreItems.filter((item) => item.category === activeCategory)
-
-  const showDropdown =
-    isSearchFocused && (searchQuery.trim().length > 0 || recentSearches.length > 0)
+      ? allTiles
+      : activeHashtag
+      ? allTiles
+      : allTiles.filter((item) => item.category === activeCategory)
 
   return (
-    <div className="px-3 md:px-8 pt-4 md:pt-6 space-y-5">
+    <div className="px-3 md:px-8 pt-4 md:pt-6 pb-16 md:pb-12 space-y-5 relative">
+      {/* Backdrop làm tối phần lưới bên dưới khi đang mở khung tìm kiếm */}
+      {isSearchFocused && (
+        <div
+          onClick={() => setIsSearchFocused(false)}
+          className="fixed inset-0 bg-black/40 z-20 transition-opacity"
+        />
+      )}
+
       {/* Top Integrated Search Bar */}
       <div ref={searchContainerRef} className="max-w-xl mx-auto w-full relative z-30">
-        <div className="relative flex items-center">
-          <Search className="w-4 h-4 text-muted-foreground absolute left-3.5 pointer-events-none" />
+        <div
+          className={`relative flex items-center rounded-2xl transition-all duration-150 ${
+            isSearchFocused
+              ? "bg-white dark:bg-zinc-900 border-2 border-primary shadow-xl ring-4 ring-primary/10"
+              : "bg-zinc-100 dark:bg-zinc-900 border border-border hover:border-foreground/30 shadow-xs"
+          }`}
+        >
+          <Search
+            className={`w-4 h-4 absolute left-4 pointer-events-none transition-colors ${
+              isSearchFocused ? "text-primary" : "text-muted-foreground"
+            }`}
+          />
           <input
             type="text"
             value={searchQuery}
@@ -192,8 +294,8 @@ function ExploreContent() {
               setSearchQuery(e.target.value)
               if (!isSearchFocused) setIsSearchFocused(true)
             }}
-            placeholder="Tìm kiếm tài khoản, tên hiển thị..."
-            className="w-full h-11 pl-10 pr-10 rounded-xl bg-muted/70 border border-border/50 text-xs sm:text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:bg-background transition shadow-xs"
+            placeholder="Tìm kiếm tài khoản, tên hoặc #hashtag..."
+            className="w-full h-12 pl-11 pr-10 rounded-2xl bg-transparent text-xs sm:text-sm text-foreground placeholder:text-muted-foreground outline-none"
           />
           {searchQuery && (
             <button
@@ -201,58 +303,104 @@ function ExploreContent() {
               onClick={() => {
                 setSearchQuery("")
                 setSearchResults([])
+                setHashtagResults([])
               }}
-              className="absolute right-3 p-1 rounded-full bg-muted-foreground/20 hover:bg-muted-foreground/30 text-muted-foreground hover:text-foreground transition"
+              className="absolute right-3 p-1 rounded-full bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-foreground transition"
               aria-label="Xóa từ khóa"
             >
-              <X className="w-3 h-3" />
+              <X className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
 
-        {/* Search Dropdown Overlay (Recent Searches or Live User Results) */}
-        {showDropdown && (
-          <div className="absolute top-full left-0 right-0 mt-2 rounded-2xl border border-border bg-card/95 backdrop-blur-md shadow-xl overflow-hidden">
+        {/* Search Dropdown Overlay */}
+        {isSearchFocused && (
+          <div className="absolute top-full left-0 right-0 mt-2 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-foreground shadow-2xl overflow-hidden z-40">
             {searchQuery.trim() ? (
               isSearching ? (
-                <div className="p-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Đang tìm kiếm...</span>
+                <div className="p-6 flex items-center justify-center gap-2.5 text-xs text-muted-foreground bg-white dark:bg-zinc-900">
+                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                  <span>Đang tìm kiếm &ldquo;{searchQuery.trim()}&rdquo;...</span>
                 </div>
-              ) : searchResults.length === 0 ? (
-                <div className="p-6 text-center text-xs text-muted-foreground">
-                  Không tìm thấy tài khoản nào khớp với &ldquo;{searchQuery.trim()}&rdquo;.
+              ) : searchResults.length === 0 && hashtagResults.length === 0 ? (
+                <div className="p-6 text-center text-xs text-muted-foreground bg-white dark:bg-zinc-900">
+                  Không tìm thấy kết quả nào khớp với &ldquo;{searchQuery.trim()}&rdquo;.
                 </div>
               ) : (
-                <div className="divide-y divide-border/40 max-h-80 overflow-y-auto">
-                  {searchResults.map((u) => (
-                    <button
-                      key={u.id || u.username}
-                      type="button"
-                      onClick={() => handleSelectUser(u)}
-                      className="w-full flex items-center gap-3 p-3 text-left hover:bg-muted/60 transition"
-                    >
-                      <img
-                        src={u.avatarUrl || "/profile.jpg"}
-                        alt={u.username}
-                        className="w-10 h-10 rounded-full object-cover bg-muted shrink-0"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold text-foreground truncate">
-                          {u.username}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground truncate">
-                          {u.displayName || u.category || "Người dùng Snapgram"}
-                        </p>
+                <div className="max-h-80 overflow-y-auto bg-white dark:bg-zinc-900 divide-y divide-zinc-100 dark:divide-zinc-800">
+                  {/* Hashtags Section */}
+                  {hashtagResults.length > 0 && (
+                    <div>
+                      <div className="px-4 py-2 bg-muted/40 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                        <Hash className="w-3 h-3" />
+                        <span>Hashtags</span>
                       </div>
-                      <User className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                    </button>
-                  ))}
+                      {hashtagResults.map((tag) => (
+                        <button
+                          key={tag.id || tag.tag}
+                          type="button"
+                          onClick={() => handleSelectHashtag(tag.tag)}
+                          className="w-full flex items-center gap-3.5 px-4 py-2.5 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800/90 transition"
+                        >
+                          <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                            <Hash className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold text-foreground">
+                              #{tag.tag}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {(tag.postCount ?? 0).toLocaleString("vi-VN")} bài viết
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Users Section */}
+                  {searchResults.length > 0 && (
+                    <div>
+                      <div className="px-4 py-2 bg-muted/40 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                        <User className="w-3 h-3" />
+                        <span>Tài khoản</span>
+                      </div>
+                      {searchResults.map((u) => (
+                        <button
+                          key={u.id || u.username}
+                          type="button"
+                          onClick={() => handleSelectUser(u)}
+                          className="w-full flex items-center gap-3.5 px-4 py-3 text-left hover:bg-zinc-100 dark:hover:bg-zinc-800/90 transition"
+                        >
+                          <img
+                            src={u.avatarUrl || "/profile.jpg"}
+                            alt={u.username}
+                            className="w-10 h-10 rounded-full object-cover bg-muted border border-border shrink-0"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1 min-w-0">
+                              <p className="text-xs sm:text-sm font-semibold text-foreground truncate">
+                                {u.username}
+                              </p>
+                              <VerifiedBadge
+                                verified={u.verified}
+                                verifiedUntil={u.verifiedUntil}
+                                size={13}
+                              />
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {u.displayName || u.category || "Người dùng Snapgram"}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )
-            ) : (
-              <div>
-                <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50">
+            ) : recentSearches.length > 0 ? (
+              <div className="bg-white dark:bg-zinc-900">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-100 dark:border-zinc-800">
                   <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5 text-muted-foreground" />
                     Tìm kiếm gần đây
@@ -260,30 +408,37 @@ function ExploreContent() {
                   <button
                     type="button"
                     onClick={clearAllRecent}
-                    className="text-[11px] font-semibold text-primary hover:underline"
+                    className="text-xs font-semibold text-primary hover:underline"
                   >
                     Xóa tất cả
                   </button>
                 </div>
 
-                <div className="divide-y divide-border/40 max-h-72 overflow-y-auto">
+                <div className="divide-y divide-zinc-100 dark:divide-zinc-800 max-h-72 overflow-y-auto">
                   {recentSearches.map((u) => (
                     <div
                       key={u.username}
                       onClick={() => handleSelectUser(u)}
-                      className="flex items-center justify-between gap-3 p-3 hover:bg-muted/60 transition cursor-pointer"
+                      className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/90 transition cursor-pointer"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center gap-3.5 min-w-0">
                         <img
                           src={u.avatarUrl || "/profile.jpg"}
                           alt={u.username}
-                          className="w-9 h-9 rounded-full object-cover bg-muted shrink-0"
+                          className="w-10 h-10 rounded-full object-cover bg-muted border border-border shrink-0"
                         />
                         <div className="min-w-0">
-                          <p className="text-xs font-semibold text-foreground truncate">
-                            {u.username}
-                          </p>
-                          <p className="text-[11px] text-muted-foreground truncate">
+                          <div className="flex items-center gap-1 min-w-0">
+                            <p className="text-xs sm:text-sm font-semibold text-foreground truncate">
+                              {u.username}
+                            </p>
+                            <VerifiedBadge
+                              verified={u.verified}
+                              verifiedUntil={u.verifiedUntil}
+                              size={13}
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">
                             {u.displayName || "Người dùng Snapgram"}
                           </p>
                         </div>
@@ -292,7 +447,7 @@ function ExploreContent() {
                       <button
                         type="button"
                         onClick={(e) => removeRecentItem(u.username, e)}
-                        className="p-1.5 text-muted-foreground hover:text-foreground transition"
+                        className="p-1.5 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-700 text-muted-foreground hover:text-foreground transition"
                         aria-label="Xóa khỏi lịch sử"
                       >
                         <X className="w-3.5 h-3.5" />
@@ -300,6 +455,10 @@ function ExploreContent() {
                     </div>
                   ))}
                 </div>
+              </div>
+            ) : (
+              <div className="p-6 text-center text-xs text-muted-foreground bg-white dark:bg-zinc-900">
+                Nhập tên tài khoản, tên hiển thị hoặc #hashtag để bắt đầu tìm kiếm.
               </div>
             )}
           </div>
@@ -312,7 +471,7 @@ function ExploreContent() {
           <button
             key={cat}
             type="button"
-            onClick={() => setActiveCategory(cat)}
+            onClick={() => handleSelectCategory(cat)}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition ${
               activeCategory === cat
                 ? "bg-foreground text-background"
@@ -322,44 +481,103 @@ function ExploreContent() {
             {cat}
           </button>
         ))}
+        {activeHashtag && !categories.includes(`#${activeHashtag}`) && (
+          <button
+            type="button"
+            className="px-3.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap bg-foreground text-background"
+          >
+            #{activeHashtag}
+          </button>
+        )}
       </div>
 
       {/* Explore Mosaic / Grid Layout Below */}
-      <div className="grid grid-cols-3 gap-1 md:gap-2 auto-rows-[140px] sm:auto-rows-[200px] md:auto-rows-[260px] pt-1">
-        {filteredExploreItems.map((item) => (
-          <Link
-            key={item.id}
-            href={`/p/${item.id}`}
-            scroll={false}
-            className={`relative group bg-muted overflow-hidden select-none rounded-sm ${
-              item.span || ""
-            }`}
-          >
-            <img
-              src={item.image}
-              alt={item.id}
-              className="w-full h-full object-cover transition duration-300 group-hover:scale-105"
+      {isLoadingPosts ? (
+        <div className="grid grid-cols-3 gap-1 md:gap-2 auto-rows-[140px] sm:auto-rows-[200px] md:auto-rows-[260px] pt-1">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div
+              key={i}
+              className={`rounded-sm bg-muted/60 animate-pulse ${
+                i % 6 === 2 ? "row-span-2 col-span-2" : "col-span-1 row-span-1"
+              }`}
             />
+          ))}
+        </div>
+      ) : filteredExploreItems.length === 0 ? (
+        <div className="py-20 text-center space-y-3">
+          <div className="w-16 h-16 rounded-full border-2 border-dashed border-border flex items-center justify-center mx-auto text-muted-foreground">
+            <Compass className="w-8 h-8 opacity-70" />
+          </div>
+          <h3 className="text-base font-semibold text-foreground">
+            Chưa có bài viết nào
+          </h3>
+          <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+            Không tìm thấy bài viết nào trong danh mục &quot;{activeCategory}&quot;.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-1 md:gap-2 auto-rows-[140px] sm:auto-rows-[200px] md:auto-rows-[260px] pt-1">
+          {filteredExploreItems.map((item) => (
+            <Link
+              key={item.id}
+              href={item.isReel ? `/reel/${item.id}` : `/p/${item.id}`}
+              scroll={false}
+              className={`relative group bg-muted overflow-hidden select-none rounded-sm ${
+                item.span || ""
+              }`}
+            >
+              {item.videoUrl ? (
+                <video
+                  src={item.videoUrl}
+                  poster={item.image || undefined}
+                  muted
+                  loop
+                  playsInline
+                  preload="metadata"
+                  className="w-full h-full object-cover transition duration-300 group-hover:scale-105 pointer-events-none"
+                  onMouseEnter={(e) => {
+                    const v = e.currentTarget
+                    v.play().catch(() => {})
+                  }}
+                  onMouseLeave={(e) => {
+                    const v = e.currentTarget
+                    v.pause()
+                  }}
+                />
+              ) : item.image ? (
+                <img
+                  src={item.image}
+                  alt={item.id}
+                  className="w-full h-full object-cover transition duration-300 group-hover:scale-105"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-muted to-muted-foreground/20" />
+              )}
 
-            {item.isReel && (
-              <div className="absolute top-2.5 right-2.5 z-10 text-white drop-shadow-md">
-                <Film className="w-4 h-4" />
-              </div>
-            )}
+              {item.isReel ? (
+                <div className="absolute top-2.5 right-2.5 z-10 text-white drop-shadow-md">
+                  <Film className="w-4 h-4" />
+                </div>
+              ) : item.isCarousel ? (
+                <div className="absolute top-2.5 right-2.5 z-10 text-white drop-shadow-md">
+                  <Layers className="w-4 h-4" />
+                </div>
+              ) : null}
 
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 sm:gap-6 text-white font-semibold text-xs sm:text-sm">
-              <div className="flex items-center gap-1.5">
-                <Heart className="w-4 h-4 sm:w-5 sm:h-5 fill-white" />
-                <span>{item.likes.toLocaleString("vi-VN")}</span>
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 sm:gap-6 text-white font-semibold text-xs sm:text-sm">
+                <div className="flex items-center gap-1.5">
+                  <Heart className="w-4 h-4 sm:w-5 sm:h-5 fill-white" />
+                  <span>{item.likes.toLocaleString("vi-VN")}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5 fill-white -rotate-90" />
+                  <span>{item.comments}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5 fill-white -rotate-90" />
-                <span>{item.comments}</span>
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -371,7 +589,7 @@ export default function ExplorePage() {
       <Sidebar />
 
       {/* Main Explore Container */}
-      <div className="flex-1 flex flex-col min-w-0 max-w-5xl mx-auto pb-12">
+      <div className="flex-1 flex flex-col min-w-0 max-w-5xl mx-auto">
         <Navbar />
         <Suspense fallback={<div className="p-8 text-center text-xs text-muted-foreground">Đang tải...</div>}>
           <ExploreContent />

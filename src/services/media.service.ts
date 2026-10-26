@@ -20,16 +20,27 @@ export const mediaService = {
 
   /**
    * POST /api/media/upload — Direct Upload (Multipart)
-   * Khuyên dùng cho Avatar hoặc ảnh đơn giản
+   * `onProgress` nhận phần trăm 0–100 để hiển thị tiến trình cho người dùng.
    */
-  async upload(file: File): Promise<MediaResponse> {
+  async upload(
+    file: File,
+    onProgress?: (percent: number) => void
+  ): Promise<MediaResponse> {
     const formData = new FormData()
     formData.append("file", file)
     const res = await apiClient.post<MediaResponse>("/api/media/upload", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
+      onUploadProgress: (event) => {
+        if (!onProgress) return
+        const total = event.total ?? file.size
+        if (!total) return
+        // Giữ 99% cho tới khi server trả về để không "nhảy" 100% quá sớm
+        onProgress(Math.min(99, Math.round((event.loaded * 100) / total)))
+      },
     })
+    onProgress?.(100)
     return res.data
   },
 
@@ -62,15 +73,21 @@ export const mediaService = {
 
   /**
    * Luồng Presigned Upload trọn gói (tạo URL -> PUT MinIO -> confirm)
+   * Tự động fallback sang Direct Upload (/api/media/upload) nếu presigned upload gặp lỗi mạng hoặc DNS.
    */
   async uploadViaPresigned(file: File): Promise<MediaResponse> {
-    const presigned = await this.createPresignedUpload({
-      fileName: file.name,
-      mimeType: file.type || "application/octet-stream",
-      sizeBytes: file.size,
-    })
-    await this.uploadFileToPresignedUrl(presigned.uploadUrl, file)
-    return this.confirmPresignedUpload(presigned.mediaId)
+    try {
+      const presigned = await this.createPresignedUpload({
+        fileName: file.name,
+        mimeType: file.type || "application/octet-stream",
+        sizeBytes: file.size,
+      })
+      await this.uploadFileToPresignedUrl(presigned.uploadUrl, file)
+      return await this.confirmPresignedUpload(presigned.mediaId)
+    } catch (err) {
+      console.warn("Presigned upload failed, falling back to direct upload:", err)
+      return await this.upload(file)
+    }
   },
 
   /**

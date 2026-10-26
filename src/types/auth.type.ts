@@ -10,12 +10,20 @@ export interface UserMe {
   effectivePermissions?: string[]
   avatarUrl?: string
   emailVerified?: boolean
+  verified?: boolean
+  verifiedUntil?: string
   createdAt?: string
 }
 
 export interface LoginPayload {
   email: string
   password: string
+}
+
+export interface FacebookLoginPayload {
+  code?: string
+  redirectUri?: string
+  accessToken?: string
 }
 
 export interface RegisterPayload {

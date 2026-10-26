@@ -8,8 +8,10 @@ const AUTH_PAGES = ["/login", "/register", "/forgot-password", "/reset-password"
 function isPublicContentPath(pathname: string): boolean {
   return (
     pathname === "/verify-email" ||
+    pathname === "/payment/result" ||
     pathname === "/explore" ||
     pathname === "/reels" ||
+    pathname.startsWith("/oauth/") ||
     pathname.startsWith("/p/") ||
     pathname.startsWith("/reel/") ||
     pathname.startsWith("/u/")
@@ -19,9 +21,10 @@ function isPublicContentPath(pathname: string): boolean {
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  const userToken =
+  const rawToken =
     request.cookies.get(USER_TOKEN_KEY)?.value ||
     request.cookies.get("snapgram_access_token")?.value
+  const userToken = rawToken && rawToken.trim().length > 0 ? rawToken : null
 
   const isAuthPage = AUTH_PAGES.includes(pathname)
 
@@ -38,7 +41,8 @@ export function proxy(request: NextRequest) {
   // Chưa login mà vào trang gốc (/) hoặc trang cá nhân (/profile, /settings...) -> đẩy ra /login
   if (!userToken && !isAuthPage) {
     const url = new URL("/login", request.url)
-    if (pathname !== "/") url.searchParams.set("redirect", pathname)
+    const redirectTo = `${pathname}${request.nextUrl.search}`
+    if (redirectTo !== "/") url.searchParams.set("redirect", redirectTo)
     return NextResponse.redirect(url)
   }
 

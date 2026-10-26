@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/api"
 import type {
+  FacebookLoginPayload,
   ForgotPasswordPayload,
   LoginPayload,
   LoginResponse,
@@ -19,6 +20,11 @@ export const authService = {
 
   async login(params: LoginPayload): Promise<LoginResponse> {
     const res = await apiClient.post<LoginResponse>("/api/auth/login", params)
+    return res.data
+  },
+
+  async loginFacebook(params: FacebookLoginPayload): Promise<LoginResponse> {
+    const res = await apiClient.post<LoginResponse>("/api/auth/facebook", params)
     return res.data
   },
 
@@ -67,7 +73,14 @@ export const authService = {
   async logout(): Promise<void> {
     try {
       await apiClient.post("/api/auth/logout", {})
+    } catch {
+      // Continue even if network error
     } finally {
+      if (typeof document !== "undefined") {
+        document.cookie = "access_token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+        document.cookie = "admin_access_token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+        document.cookie = "snapgram_access_token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+      }
       window.location.href = "/login"
     }
   },
