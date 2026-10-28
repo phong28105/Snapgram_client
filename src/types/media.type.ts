@@ -35,3 +35,14 @@ export interface PageMediaResponse {
   last: boolean
   empty: boolean
 }
+
+export type CaptionTone = "FRIENDLY" | "FORMAL" | "FUNNY" | "SHORT"
+
+export type MediaVisualType = "IMAGE" | "VIDEO"
+
+export interface AiCaptionResponse {
+  captions: string[]
+  hashtags: string[]
+  altText: string
+  cacheHit: boolean
+}
