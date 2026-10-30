@@ -12,11 +12,13 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
+  Copy,
   FileVideo,
   Image,
   Loader2,
   Plus,
   Smile,
+  Sparkles,
   X,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -27,6 +29,8 @@ import { mediaService } from "@/services/media.service"
 import { contentService } from "@/services/content.service"
 import { getErrorMessage } from "@/lib/api"
 import { isVideoMedia } from "@/lib/media"
+import { extractVideoKeyframe } from "@/utils/video-frame"
+import type { CaptionTone, AiCaptionResponse } from "@/types/media.type"
 import type { ContentVisibility, PostContentType, PostMediaRequest } from "@/types/content.type"
 
 interface CreatePostProps {
@@ -59,6 +63,12 @@ const CreatePost: React.FC<CreatePostProps> = ({ children }) => {
   const [contentType, setContentType] = useState<PostContentType>("POST")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // AI Caption State
+  const [isAiOpen, setIsAiOpen] = useState(false)
+  const [aiTone, setAiTone] = useState<CaptionTone>("FRIENDLY")
+  const [isAiGenerating, setIsAiGenerating] = useState(false)
+  const [aiResult, setAiResult] = useState<AiCaptionResponse | null>(null)
+
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const addMoreInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -72,6 +82,9 @@ const CreatePost: React.FC<CreatePostProps> = ({ children }) => {
     setTags("")
     setVisibility("PUBLIC")
     setContentType("POST")
+    setIsAiOpen(false)
+    setAiResult(null)
+    setIsAiGenerating(false)
   }
 
   const handleOpenChange = (open: boolean) => {
@@ -152,6 +165,83 @@ const CreatePost: React.FC<CreatePostProps> = ({ children }) => {
 
   const handleNextSlide = () => {
     setCurrentIndex((prev) => Math.min(mediaList.length - 1, prev + 1))
+  }
+
+  const handleGenerateAiCaption = async () => {
+    if (mediaList.length === 0) {
+      toast.warning("Vui lòng chọn ảnh hoặc video trước khi dùng AI gợi ý.")
+      return
+    }
+
+    const currentMedia = mediaList[currentIndex] || mediaList[0]
+    setIsAiGenerating(true)
+    setIsAiOpen(true)
+
+    try {
+      let fileToAnalyze = currentMedia.file
+      const mediaVisualType = currentMedia.isVideo ? "VIDEO" : "IMAGE"
+
+      // Nếu là video, tự động bóc frame nhanh phía client
+      if (currentMedia.isVideo) {
+        try {
+          fileToAnalyze = await extractVideoKeyframe(currentMedia.file, 1.0)
+        } catch (frameErr) {
+          console.warn("Client frame extraction failed, falling back to original file:", frameErr)
+          fileToAnalyze = currentMedia.file
+        }
+      }
+
+      const res = await mediaService.generateAiCaption(fileToAnalyze, aiTone, mediaVisualType)
+      setAiResult(res)
+      if (res.cacheHit) {
+        toast.info("Đã tải gợi ý AI từ bộ nhớ đệm (Cache Hit)!")
+      } else {
+        toast.success("AI đã tạo gợi ý thành công!")
+      }
+    } catch (err: unknown) {
+      const msg = getErrorMessage(err, "Không thể kết nối dịch vụ AI. Bạn có thể tự viết caption.")
+      toast.error(msg)
+    } finally {
+      setIsAiGenerating(false)
+    }
+  }
+
+  const handleApplyCaption = (suggestedCaption: string) => {
+    setCaption(suggestedCaption)
+    toast.success("Đã áp dụng caption!")
+  }
+
+  const handleApplyHashtags = (hashtagsToAdd: string[]) => {
+    const existingTags: string[] = caption.match(/#[\p{L}\p{N}_]+/gu) || []
+    const newTags = hashtagsToAdd.filter((h) => !existingTags.includes(h))
+
+    if (newTags.length === 0) {
+      toast.info("Tất cả các hashtag này đã có trong bài viết.")
+      return
+    }
+
+    const updated = caption.trim() ? `${caption.trim()} ${newTags.join(" ")}` : newTags.join(" ")
+    setCaption(updated)
+    toast.success(`Đã thêm ${newTags.length} hashtag vào bài viết!`)
+  }
+
+  const handleApplySingleHashtag = (tag: string) => {
+    if (caption.includes(tag)) {
+      toast.info(`Hashtag ${tag} đã có trong bài viết.`)
+      return
+    }
+    const updated = caption.trim() ? `${caption.trim()} ${tag}` : tag
+    setCaption(updated)
+    toast.success(`Đã thêm ${tag}`)
+  }
+
+  const handleCopyAltText = (text: string) => {
+    if (!navigator.clipboard) {
+      toast.error("Trình duyệt không hỗ trợ sao chép vào clipboard.")
+      return
+    }
+    navigator.clipboard.writeText(text)
+    toast.success("Đã sao chép Alt-text vào bộ nhớ tạm!")
   }
 
   const handleShare = async () => {
@@ -457,9 +547,150 @@ const CreatePost: React.FC<CreatePostProps> = ({ children }) => {
                 />
 
                 <div className="flex items-center justify-between pt-2 border-t border-border/40 text-muted-foreground">
-                  <Smile className="w-4 h-4 hover:text-foreground cursor-pointer transition" />
+                  <div className="flex items-center gap-2">
+                    <Smile className="w-4 h-4 hover:text-foreground cursor-pointer transition" />
+                    <button
+                      type="button"
+                      onClick={() => setIsAiOpen((prev) => !prev)}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors ${
+                        isAiOpen
+                          ? "bg-purple-600/15 text-purple-400 border border-purple-500/30"
+                          : "hover:bg-accent text-muted-foreground hover:text-foreground"
+                      }`}
+                      title="Gợi ý caption, hashtag và alt-text bằng AI"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
+                      <span>Trợ lý AI</span>
+                    </button>
+                  </div>
                   <span className="text-[10px]">{caption.length}/2,200</span>
                 </div>
+
+                {/* AI Assistant Section */}
+                {isAiOpen && (
+                  <div className="rounded-xl border border-purple-500/20 bg-purple-950/10 p-3 space-y-2.5 text-xs animate-in fade-in-50 duration-200">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-[11px] text-purple-400 inline-flex items-center gap-1.5">
+                        <Sparkles className="w-3 h-3" />
+                        Gợi ý thông minh ({mediaList[currentIndex]?.isVideo ? "Video" : "Ảnh"})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsAiOpen(false)}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Tone Selector & Trigger */}
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        value={aiTone}
+                        onChange={(e) => setAiTone(e.target.value as CaptionTone)}
+                        disabled={isAiGenerating}
+                        className="flex-1 h-7 rounded-md border border-border bg-background px-2 text-[11px] outline-none focus:border-purple-500"
+                      >
+                        <option value="FRIENDLY">Tone: Thân thiện</option>
+                        <option value="FUNNY">Tone: Hài hước / Trend</option>
+                        <option value="FORMAL">Tone: Lịch sự / Chuyên nghiệp</option>
+                        <option value="SHORT">Tone: Ngắn gọn / Tối giản</option>
+                      </select>
+
+                      <button
+                        type="button"
+                        onClick={handleGenerateAiCaption}
+                        disabled={isAiGenerating}
+                        className="h-7 px-2.5 rounded-md bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-medium text-[11px] inline-flex items-center gap-1 transition-colors shrink-0"
+                      >
+                        {isAiGenerating ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            <span>Đang nghĩ...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-3 h-3" />
+                            <span>Phân tích</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* AI Suggestions Content */}
+                    {aiResult && (
+                      <div className="space-y-2.5 pt-1">
+                        {/* Captions List */}
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-semibold text-muted-foreground block">
+                            CHỌN CAPTION PHÙ HỢP:
+                          </span>
+                          <div className="space-y-1.5">
+                            {aiResult.captions.map((item, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => handleApplyCaption(item)}
+                                className="w-full text-left p-2 rounded-lg bg-background/80 hover:bg-accent border border-border/60 hover:border-purple-500/40 text-[11px] text-foreground transition-all flex items-start gap-1.5 group"
+                              >
+                                <span className="text-purple-400 font-bold shrink-0">{idx + 1}.</span>
+                                <span className="flex-1 leading-snug line-clamp-3">{item}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Hashtags */}
+                        {aiResult.hashtags.length > 0 && (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-semibold text-muted-foreground">
+                                HASHTAG GỢI Ý:
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleApplyHashtags(aiResult.hashtags)}
+                                className="text-[10px] text-purple-400 hover:underline font-medium"
+                              >
+                                Thêm tất cả
+                              </button>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {aiResult.hashtags.map((tag, idx) => (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  onClick={() => handleApplySingleHashtag(tag)}
+                                  className="px-1.5 py-0.5 rounded bg-background hover:bg-purple-600/20 border border-border text-[10px] text-purple-300 transition-colors"
+                                >
+                                  {tag}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Alt-Text */}
+                        {aiResult.altText && (
+                          <div className="p-2 rounded-md bg-background/50 border border-border/40 text-[10px] space-y-1">
+                            <div className="flex items-center justify-between text-muted-foreground">
+                              <span className="font-semibold">Alt-Text (cho người khiếm thị):</span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyAltText(aiResult.altText)}
+                                className="inline-flex items-center gap-0.5 text-purple-400 hover:underline"
+                              >
+                                <Copy className="w-2.5 h-2.5" />
+                                <span>Copy</span>
+                              </button>
+                            </div>
+                            <p className="text-muted-foreground italic line-clamp-2">{aiResult.altText}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="space-y-2 pt-2 border-t border-border/40">
                   <div className="space-y-1">

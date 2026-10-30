@@ -7,12 +7,14 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { ModeToggle } from "@/components/ui/mode-toggle"
 import { useAuth } from "@/hooks/use-auth"
 import { AccountSettingsDialog } from "@/components/profile/account-settings-dialog"
+import { SupportDialog } from "@/components/support/support-dialog"
 import { useLoginModal } from "@/components/providers/login-modal-provider"
 
 export function MoreMenu() {
   const { user, isAuthenticated, logout, refreshUser } = useAuth()
   const { openLoginModal } = useLoginModal()
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [isSupportOpen, setIsSupportOpen] = useState(false)
 
   const handleLogout = async () => {
     await logout()
@@ -55,7 +57,13 @@ export function MoreMenu() {
 
           <ModeToggle />
 
-          <DropdownMenuItem className="flex items-center gap-3 py-3 px-3 rounded-lg cursor-pointer">
+          <DropdownMenuItem
+            onSelect={() => {
+              if (!isAuthenticated) openLoginModal()
+              else setIsSupportOpen(true)
+            }}
+            className="flex items-center gap-3 py-3 px-3 rounded-lg cursor-pointer"
+          >
             <AlertCircle className="w-5 h-5" /><span className="text-base font-light">Báo cáo sự cố</span>
           </DropdownMenuItem>
           <DropdownMenuSeparator className="my-1" />
@@ -77,6 +85,11 @@ export function MoreMenu() {
         onOpenChange={setIsSettingsOpen}
         profile={user}
         onProfileUpdated={() => refreshUser()}
+      />
+
+      <SupportDialog
+        open={isSupportOpen}
+        onOpenChange={setIsSupportOpen}
       />
     </>
   )

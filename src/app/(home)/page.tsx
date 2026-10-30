@@ -6,7 +6,7 @@ import Sideright from "./_components/sideright"
 
 const Page = () => {
   return (
-    <main className="min-h-screen flex">
+    <main className="min-h-screen flex pb-14 md:pb-0">
       <Sidebar />
       <div className="max-md:w-full md:max-w-7xl mx-auto flex flex-col md:flex-row">
         <Navbar />

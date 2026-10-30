@@ -7,6 +7,8 @@ import React from "react";
 import { NotificationsSheet } from "@/components/notifications/notifications-sheet";
 import { NotificationBadge } from "@/components/notifications/notification-badge";
 import { useNotifications } from "@/hooks/use-notifications";
+import SnapgramThumb from "@/components/logo/SnapgramThumb";
+import SnapgramLogo from "@/components/logo/SnapgramLogo";
 
 const Navbar = () => {
   const router = useRouter();
@@ -27,13 +29,13 @@ const Navbar = () => {
   return (
     <nav className="h-[54px] sm:h-[60px] hidden max-md:flex flex-row items-center px-3 sm:px-4 border-b border-border sticky top-0 z-30 bg-background/95 backdrop-blur-md shrink-0 w-full">
       <div className="w-full flex flex-row items-center justify-between gap-2">
-        <Link href="/" className="relative shrink-0">
-          <img
-            src="/text-logo.png"
-            alt="Text Logo"
-            width={105}
-            className="pointer-events-none w-[96px] sm:w-[108px] h-auto"
-          />
+        <Link
+          href="/"
+          className="flex items-center gap-2 group shrink-0 select-none"
+          aria-label="Snapgram Trang chủ"
+        >
+          <SnapgramThumb className="w-6 h-6 sm:w-7 sm:h-7 text-foreground transition-transform duration-200 group-hover:scale-105" />
+          <SnapgramLogo className="w-[88px] sm:w-[100px] h-auto text-foreground" />
         </Link>
 
         <div className="flex flex-row items-center gap-x-2 sm:gap-x-3">

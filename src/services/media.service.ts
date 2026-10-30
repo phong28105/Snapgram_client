@@ -1,7 +1,10 @@
 import axios from "axios"
 import { apiClient } from "@/lib/api"
 import type {
+  AiCaptionResponse,
+  CaptionTone,
   MediaResponse,
+  MediaVisualType,
   PageMediaResponse,
   PresignedUrlRequest,
   PresignedUrlResponse,
@@ -103,5 +106,27 @@ export const mediaService = {
    */
   async deleteMedia(id: string): Promise<void> {
     await apiClient.delete(`/api/media/${id}`)
+  },
+
+  /**
+   * POST /api/media/ai/caption — Gợi ý Caption, Hashtag & Alt-Text bằng Vision AI
+   */
+  async generateAiCaption(
+    file: File,
+    tone: CaptionTone = "FRIENDLY",
+    mediaType: MediaVisualType = "IMAGE"
+  ): Promise<AiCaptionResponse> {
+    const formData = new FormData()
+    formData.append("file", file)
+    formData.append("tone", tone)
+    formData.append("mediaType", mediaType)
+
+    const res = await apiClient.post<AiCaptionResponse>("/api/media/ai/caption", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      timeout: 35000, // 35 seconds to allow for 30s model timeout
+    })
+    return res.data
   },
 }

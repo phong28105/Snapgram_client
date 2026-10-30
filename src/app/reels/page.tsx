@@ -447,11 +447,11 @@ export default function ReelsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex bg-background">
+      <div className="min-h-screen flex bg-background pb-14 md:pb-0">
         <Sidebar />
-        <div className="flex-1 flex flex-col items-center justify-center min-w-0 py-4 px-2 sm:px-4">
+        <div className="flex-1 flex flex-col items-center justify-start min-w-0 w-full">
           <Navbar />
-          <div className="relative w-[340px] sm:w-[380px] h-[640px] sm:h-[720px] rounded-2xl bg-muted animate-pulse my-auto flex items-center justify-center">
+          <div className="relative w-[340px] sm:w-[380px] h-[calc(100dvh-130px)] sm:h-[720px] rounded-2xl bg-muted animate-pulse my-auto flex items-center justify-center">
             <Film className="w-12 h-12 text-muted-foreground/40 animate-pulse" />
           </div>
           <Navbot />
@@ -462,9 +462,9 @@ export default function ReelsPage() {
 
   if (!currentReel) {
     return (
-      <div className="min-h-screen flex bg-background">
+      <div className="min-h-screen flex bg-background pb-14 md:pb-0">
         <Sidebar />
-        <div className="flex-1 flex flex-col items-center justify-center min-w-0 py-4 px-2 sm:px-4">
+        <div className="flex-1 flex flex-col items-center justify-start min-w-0 w-full">
           <Navbar />
           <div className="text-center space-y-4 my-auto px-4">
             <div className="w-16 h-16 rounded-full border-2 border-dashed border-border flex items-center justify-center mx-auto text-muted-foreground">
@@ -499,15 +499,15 @@ export default function ReelsPage() {
   )
 
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className="min-h-screen flex bg-background pb-14 md:pb-0">
       {/* Desktop Sidebar */}
       <Sidebar />
 
       {/* Main Reels Container */}
-      <div className="flex-1 flex flex-col items-center justify-between sm:justify-center min-w-0 w-full py-0 sm:py-4 px-0 sm:px-4">
+      <div className="flex-1 flex flex-col items-center justify-start min-w-0 w-full">
         <Navbar />
 
-        <div className="flex items-center justify-center sm:gap-4 my-auto w-full max-w-[390px] sm:max-w-none px-2 sm:px-0">
+        <div className="flex items-center justify-center sm:gap-4 my-auto w-full max-w-[390px] sm:max-w-none px-2 sm:px-0 py-2 sm:py-4">
           {/* Reel Video Card */}
           <div
             className="relative w-full sm:w-[380px] h-[calc(100dvh-130px)] sm:h-[720px] max-h-[720px] rounded-2xl overflow-hidden bg-black shadow-2xl flex items-center justify-center select-none group touch-pan-y"
