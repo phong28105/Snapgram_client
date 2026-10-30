@@ -26,7 +26,8 @@ const Sidebar = () => {
         <div className="flex flex-col">
           <div className="relative mb-[19px] xl:pb-4 xl:px-3 xl:pt-[25px] max-xl:pb-[23px] max-xl:h-[92px]">
             <Link href="/" className="max-xl:absolute max-xl:top-1/2 max-xl:left-1/2 max-xl:-translate-y-1/2 max-xl:-translate-x-1/2 max-xl:p-3 max-xl:hover:bg-accent max-xl:rounded-lg group">
-              <div className="max-xl:hidden">
+              <div className="max-xl:hidden flex items-center gap-2">
+                <SnapgramThumb className="w-8 h-8 text-black dark:text-white transition-transform duration-200 group-hover:scale-105" />
                 <SnapgramLogo className="w-[120px] h-auto text-black dark:text-white" />
               </div>
               <SnapgramThumb className="xl:hidden w-6 h-6 text-black dark:text-white transition-transform duration-200 group-hover:scale-105" />
@@ -83,15 +84,13 @@ const Sidebar = () => {
 
               const itemContent = (
                 <li
-                  className={`flex items-center xl:my-1 xl:gap-3 xl:p-3 rounded-lg hover:bg-accent cursor-pointer transition max-xl:p-2 max-xl:justify-center group ${
-                    isActive ? "bg-accent/50" : ""
-                  }`}
+                  className={`flex items-center xl:my-1 xl:gap-3 xl:p-3 rounded-lg hover:bg-accent cursor-pointer transition max-xl:p-2 max-xl:justify-center group ${isActive ? "bg-accent/50" : ""
+                    }`}
                 >
                   <DisplayIcon list={itemWithAvatar} />
                   <span
-                    className={`max-xl:hidden text-base ${
-                      isActive ? "font-bold" : "font-light"
-                    } ${list.title.toLowerCase() === "trang chủ" ? "-translate-x-[2.8px]" : ""}`}
+                    className={`max-xl:hidden text-base ${isActive ? "font-bold" : "font-light"
+                      } ${list.title.toLowerCase() === "trang chủ" ? "-translate-x-[2.8px]" : ""}`}
                   >
                     {list.title}
                   </span>
@@ -116,14 +115,12 @@ const Sidebar = () => {
           <Link href="/verified">
             <li className="flex items-center xl:my-1 xl:gap-3 xl:p-3 rounded-lg hover:bg-accent cursor-pointer transition max-xl:p-2 max-xl:justify-center group">
               <BadgeCheck
-                className={`transition duration-75 xl:w-[22px] xl:h-[22px] max-xl:w-[24px] max-xl:h-[24px] text-sky-500 max-xl:group-hover:scale-105 ${
-                  pathname === "/verified" ? "scale-105" : ""
-                }`}
+                className={`transition duration-75 xl:w-[22px] xl:h-[22px] max-xl:w-[24px] max-xl:h-[24px] text-sky-500 max-xl:group-hover:scale-105 ${pathname === "/verified" ? "scale-105" : ""
+                  }`}
               />
               <span
-                className={`max-xl:hidden text-base ${
-                  pathname === "/verified" ? "font-bold" : "font-light"
-                }`}
+                className={`max-xl:hidden text-base ${pathname === "/verified" ? "font-bold" : "font-light"
+                  }`}
               >
                 Snapgram Verified
               </span>

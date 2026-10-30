@@ -14,6 +14,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Snapgram",
   description: "A social media platform for sharing photos and videos.",
+  icons: {
+    icon: "/snapgram-logo.ico",
+  },
 };
 
 export default function RootLayout({

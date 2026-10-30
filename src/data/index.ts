@@ -7,6 +7,7 @@ import {
   MessageCircle,
   Search,
   Telescope,
+  User,
 } from "lucide-react";
 
 export type TSidebarList = {
@@ -58,6 +59,7 @@ export const sidebarLists: TSidebarList[] = [
     title: "Trang cá nhân",
     active: false,
     href: "/profile",
+    icon: User,
     img: "/profile.jpg",
   },
 ];

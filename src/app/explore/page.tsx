@@ -584,7 +584,7 @@ function ExploreContent() {
 
 export default function ExplorePage() {
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className="min-h-screen flex bg-background pb-14 md:pb-0">
       {/* Desktop Sidebar */}
       <Sidebar />
 
